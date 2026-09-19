@@ -116,7 +116,7 @@ def normalize_dementia_center_item(item: dict) -> dict:
         }
     )
     return {
-        "id": item.get("cnterNm", ""),
+        "id": f"{item.get('institutionNm', '')}-{item.get('cnterNm', '')}",
         "source": "dementia_center",
         "title": item.get("cnterNm", ""),
         "text": text,
@@ -138,4 +138,30 @@ def normalize_ltc_institution_item(item: dict) -> dict:
         "title": item.get("adminNm", ""),
         "text": text,
         "metadata": {k: v for k, v in item.items()},
+    }
+
+
+def normalize_welfare_payment_item(item: dict, year: int) -> dict:
+    """복지사업 월별 급여지급 현황 1개 행(연도-월-사업-서비스 단위)을 문장형 Document로 변환."""
+    month = item.get("기준년월", "")
+    program = item.get("사업명", "")
+    service = item.get("서비스", "")
+    count = item.get("지급건수")
+    amount = item.get("지급금액")
+    text = clean_text(
+        f"{month} 기준 '{program}' 사업의 '{service}' 서비스 지급 현황: "
+        f"지급건수 {count}건, 지급금액 {amount}백만원."
+    )
+    return {
+        "id": f"{year}-{month}-{program}-{service}",
+        "source": "welfare_payment",
+        "title": f"{program} - {service} ({month})",
+        "text": text,
+        "metadata": {
+            "기준년월": month,
+            "사업명": program,
+            "서비스": service,
+            "지급건수": count,
+            "지급금액": amount,
+        },
     }
