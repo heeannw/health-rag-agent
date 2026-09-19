@@ -68,6 +68,12 @@ python -m pipeline.build_index
 - 결과물(`chroma_db/`)은 로컬에만 생성되고 git에는 올라가지 않는다 — **팀원 각자 로컬에서 한 번씩 실행해야 함**.
 - 소스별 수집 건수는 `pipeline/build_index.py` 상단의 상수(`CENTRAL_WELFARE_LIMIT` 등)로 조절한다. 중앙부처복지서비스는 API 일일 트래픽이 100건뿐이라 보수적으로 제한되어 있으니 값을 올릴 때 주의.
 
+### 2-1. 중앙부처복지서비스 커버리지 늘리기 (일일 트래픽 제한 대응)
+```bash
+python -m pipeline.grow_welfare_central --batch 30
+```
+Chroma에 이미 들어있는 서비스ID를 확인하고 다음 페이지부터 이어서 상세조회를 가져와 추가 적재한다. 매일(또는 며칠에 걸쳐) 이 명령만 반복 실행하면 100건 트래픽 제한 안에서 조금씩 커버리지가 늘어난다 — `build_index.py`를 다시 돌리는 것과 달리 이미 수집한 것을 중복으로 다시 받지 않는다.
+
 ### 3. 검색 테스트
 ```bash
 python -m pipeline.search "65세 이상 받을 수 있는 의료 혜택"
