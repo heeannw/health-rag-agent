@@ -59,6 +59,11 @@ def _as_list(node):
     return [node] if isinstance(node, dict) else (node or [])
 
 
+def _extract_items(items_node):
+    """xmltodict가 빈 <items/> 태그를 None으로 파싱하는 경우까지 안전하게 처리."""
+    return _as_list((items_node or {}).get("item"))
+
+
 def collect_welfare_central() -> list[dict]:
     docs = []
     lst = welfare_central.search_welfare_list(num_of_rows=CENTRAL_WELFARE_LIMIT)
@@ -95,19 +100,19 @@ def collect_law() -> list[dict]:
 
 def collect_hospital() -> list[dict]:
     resp = hospital.search_hospital_assessment(num_of_rows=HOSPITAL_LIMIT)
-    items = _as_list(resp["response"]["body"]["items"].get("item"))
+    items = _extract_items(resp["response"]["body"].get("items"))
     return [normalize_hospital_item(item) for item in items]
 
 
 def collect_dementia_center() -> list[dict]:
     resp = dementia_center.search_dementia_centers(num_of_rows=DEMENTIA_LIMIT)
-    items = _as_list(resp["body"]["items"].get("item"))
+    items = _extract_items(resp["body"].get("items"))
     return [normalize_dementia_center_item(item) for item in items]
 
 
 def collect_ltc_institution() -> list[dict]:
     resp = ltc_institution.search_green_institutions(num_of_rows=LTC_LIMIT)
-    items = _as_list(resp["response"]["body"]["items"].get("item"))
+    items = _extract_items(resp["response"]["body"].get("items"))
     return [normalize_ltc_institution_item(item) for item in items]
 
 
@@ -120,8 +125,7 @@ def collect_ltc_institution_search() -> list[dict]:
     docs = []
     for region_name, si_do_cd in ltc_institution.SIDO_CODES.items():
         resp = ltc_institution.search_institutions(si_do_cd=si_do_cd, num_of_rows=LTC_SEARCH_ROWS_PER_REGION)
-        items_node = resp["response"]["body"].get("items") or {}
-        items = _as_list(items_node.get("item"))
+        items = _extract_items(resp["response"]["body"].get("items"))
         docs.extend(normalize_ltc_institution_search_item(item) for item in items)
     return docs
 

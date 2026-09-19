@@ -53,16 +53,19 @@ def chunk_text(
     chunks: list[str] = []
     current = ""
     for unit in units:
+        # unit은 _units()가 이미 chunk_size 이하로 보장하므로, current가 비어있으면
+        # candidate(=unit)는 항상 아래 continue 분기를 탄다 -> current가 비어있는 채로
+        # append되는 경우는 없다.
         candidate = f"{current}\n\n{unit}" if current else unit
         if len(candidate) <= chunk_size:
             current = candidate
             continue
 
-        if current:
-            chunks.append(current)
-            current = f"{current[-overlap:]}\n\n{unit}" if overlap else unit
-        else:
-            current = unit
+        chunks.append(current)
+        # overlap을 붙였을 때 unit 자체(<=chunk_size 보장)를 넘어서면 overlap을 포기하고
+        # unit만으로 새 청크를 시작한다 -> chunk_size 초과를 방지.
+        overlapped = f"{current[-overlap:]}\n\n{unit}" if overlap else unit
+        current = overlapped if len(overlapped) <= chunk_size else unit
 
     if current:
         chunks.append(current)
