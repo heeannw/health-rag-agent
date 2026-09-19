@@ -22,6 +22,7 @@ env/
 *.xlsx
 *.sav
 !**/sample*.csv
+_*_output.json
 
 # Vector DB / model artifacts
 *.faiss
