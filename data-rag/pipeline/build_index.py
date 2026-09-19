@@ -20,6 +20,7 @@ from pipeline.normalize import (
     normalize_hospital_item,
     normalize_dementia_center_item,
     normalize_ltc_institution_item,
+    normalize_ltc_institution_search_item,
     normalize_welfare_payment_item,
 )
 from pipeline.chunk import chunk_document
@@ -34,6 +35,7 @@ DEMENTIA_LIMIT = 200
 LTC_LIMIT = 200
 WELFARE_PAYMENT_YEAR = 2025
 WELFARE_PAYMENT_LIMIT = 100
+LTC_SEARCH_ROWS_PER_REGION = 20
 
 # 프로젝트 주제(건강정보/의료혜택/법제도)와 관련된 법령명으로 목록조회 검색
 LAW_QUERIES = [
@@ -114,6 +116,16 @@ def collect_welfare_payment() -> list[dict]:
     return [normalize_welfare_payment_item(row, WELFARE_PAYMENT_YEAR) for row in resp.get("data", [])]
 
 
+def collect_ltc_institution_search() -> list[dict]:
+    docs = []
+    for region_name, si_do_cd in ltc_institution.SIDO_CODES.items():
+        resp = ltc_institution.search_institutions(si_do_cd=si_do_cd, num_of_rows=LTC_SEARCH_ROWS_PER_REGION)
+        items_node = resp["response"]["body"].get("items") or {}
+        items = _as_list(items_node.get("item"))
+        docs.extend(normalize_ltc_institution_search_item(item) for item in items)
+    return docs
+
+
 COLLECTORS = {
     "welfare_central": collect_welfare_central,
     "welfare_local": collect_welfare_local,
@@ -121,6 +133,7 @@ COLLECTORS = {
     "hospital": collect_hospital,
     "dementia_center": collect_dementia_center,
     "ltc_institution": collect_ltc_institution,
+    "ltc_institution_search": collect_ltc_institution_search,
     "welfare_payment": collect_welfare_payment,
 }
 

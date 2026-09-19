@@ -141,6 +141,28 @@ def normalize_ltc_institution_item(item: dict) -> dict:
     }
 
 
+def normalize_ltc_institution_search_item(item: dict) -> dict:
+    """getLtcInsttSeachList02(장기요양기관 검색 목록조회) 결과 항목."""
+    text = clean_text(
+        f"{item.get('adminNm', '')}은(는) 장기요양기관으로, "
+        f"지정일 {item.get('stpRptDt', '')}에 등록되었습니다 "
+        f"(기관유형코드: {item.get('adminPttnCd', '')})."
+    )
+    return {
+        "id": f"{item.get('longTermAdminSym', '')}-{item.get('adminPttnCd', '')}",
+        "source": "ltc_institution_search",
+        "title": item.get("adminNm", ""),
+        "text": text,
+        "metadata": {
+            "기관유형코드": item.get("adminPttnCd"),
+            "시도코드": item.get("siDoCd"),
+            "시군구코드": item.get("siGunGuCd"),
+            "등록일": item.get("longTermPeribRgtDt"),
+            "지정일": item.get("stpRptDt"),
+        },
+    }
+
+
 def normalize_welfare_payment_item(item: dict, year: int) -> dict:
     """복지사업 월별 급여지급 현황 1개 행(연도-월-사업-서비스 단위)을 문장형 Document로 변환."""
     month = item.get("기준년월", "")
