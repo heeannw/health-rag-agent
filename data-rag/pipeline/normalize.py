@@ -12,14 +12,43 @@ Document = {
 from pipeline.clean import clean_text, join_sections
 
 
+def _as_list(value) -> list:
+    """xmltodict는 자식 요소가 1개면 dict, 여러 개면 list를 반환한다 -> 항상 list로 통일."""
+    if value is None:
+        return []
+    return value if isinstance(value, list) else [value]
+
+
+def _format_docs(docs: list[dict], name_key: str, link_key: str) -> str:
+    """구비서류 항목(이름+다운로드링크) 목록을 본문에 넣을 한 줄 텍스트로 변환."""
+    return "; ".join(
+        f"{d.get(name_key, '')} ({d.get(link_key)})" if d.get(link_key) else d.get(name_key, "")
+        for d in docs
+        if d.get(name_key)
+    )
+
+
 def normalize_welfare_central_detail(detail: dict) -> dict:
     d = detail["wantedDtl"]
+    apply_step = next(
+        (
+            a.get("servSeDetailLink", "")
+            for a in _as_list(d.get("applmetList"))
+            if a.get("servSeDetailNm") == "신청기관연락처목록"
+        ),
+        "",
+    )
+    laws = [l.get("servSeDetailNm", "") for l in _as_list(d.get("baslawList")) if l.get("servSeDetailNm")]
+    forms = _format_docs(_as_list(d.get("basfrmList")), "servSeDetailNm", "servSeDetailLink")
+
     text = join_sections(
         {
             "서비스 개요": d.get("wlfareInfoOutlCn", ""),
             "지원 대상": d.get("tgtrDtlCn", ""),
             "선정 기준": d.get("slctCritCn", ""),
             "서비스 내용": d.get("alwServCn", ""),
+            "신청 방법": apply_step,
+            "구비서류": forms,
         }
     )
     return {
@@ -36,12 +65,16 @@ def normalize_welfare_central_detail(detail: dict) -> dict:
             "관심주제": d.get("intrsThemaArray"),
             "기준연도": d.get("crtrYr"),
             "문의처": d.get("rprsCtadr"),
+            "근거법령": ", ".join(laws),
         },
     }
 
 
 def normalize_welfare_local_detail(detail: dict) -> dict:
     d = detail["wantedDtl"]
+    laws = [l.get("wlfareInfoReldNm", "") for l in _as_list(d.get("baslawList")) if l.get("wlfareInfoReldNm")]
+    forms = _format_docs(_as_list(d.get("basfrmList")), "wlfareInfoReldNm", "wlfareInfoReldCn")
+
     text = join_sections(
         {
             "서비스 개요": d.get("servDgst", ""),
@@ -49,6 +82,7 @@ def normalize_welfare_local_detail(detail: dict) -> dict:
             "선정 기준": d.get("slctCritCn", ""),
             "서비스 내용": d.get("alwServCn", ""),
             "신청 방법": d.get("aplyMtdCn", ""),
+            "구비서류": forms,
         }
     )
     region = " ".join(filter(None, [d.get("ctpvNm"), d.get("sggNm")]))
@@ -64,6 +98,7 @@ def normalize_welfare_local_detail(detail: dict) -> dict:
             "대상특성": d.get("trgterIndvdlNmArray"),
             "관심주제": d.get("intrsThemaNmArray"),
             "지원방식": d.get("aplyMtdNm"),
+            "근거법령": ", ".join(laws),
         },
     }
 
