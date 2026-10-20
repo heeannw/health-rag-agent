@@ -1,5 +1,55 @@
 # 단일 benefit 테이블
 
+## 생애주기·대상특성 보충
+
+`backfill_audience_fields.py`는 최초 의료 혜택 추출 보고서와 원문 XML,
+DB의 출처·서비스 ID·이름을 대조해 Supabase `healty_benefit`에 다음을 저장합니다.
+
+| DB 컬럼 (TEXT[]) | 중앙 원문 | 지자체 원문 |
+|---|---|---|
+| life_cycle_names | lifeArray | lifeNmArray |
+| target_group_names | trgterIndvdlArray | trgterIndvdlNmArray |
+
+쉼표로 분리하고 앞뒤 공백과 중복만 제거합니다. 분류명 내부 표기는 유지합니다.
+원문 값이 없으면 NULL이며 전체 대상이라는 뜻이 아닙니다.
+생애주기 분류는 정확한 신청 연령 조건을 의미하지 않습니다.
+2026-10-20 결과: 770건 중 생애주기 662건 저장 / 108건 NULL,
+대상특성 239건 저장 / 531건 NULL. 기존 17컬럼과 행 수는 그대로 검증했습니다.
+현재 의료 테이블은 이 두 컬럼을 포함하여 19컬럼입니다.
+배열 필터용 GIN 인덱스를 추가했으며 자동 갱신은 아닙니다.
+변경 전 데이터는 `data/backups/*_audience/healty_benefit.json`,
+누락된 서비스와 필드 목록은 `data/exports/*_audience_missing.json`에 저장됩니다.
+DB 갱신과 검증은 한 트랜잭션으로 실행합니다.
+
+```sql
+SELECT * FROM public.healty_benefit WHERE life_cycle_names @> ARRAY['청년']::text[];
+SELECT * FROM public.healty_benefit WHERE target_group_names @> ARRAY['장애인']::text[];
+```
+
+## 의료 혜택 주제 코드 보충
+
+`backfill_theme_codes.py`는 최초 `data/exports/*_healty_benefit.json`의 추출
+근거와 해당 목록 XML을 대조하고, `.env`에 설정된 Supabase의
+`public.healty_benefit`에 `theme_codes TEXT[]` 컬럼을 추가합니다.
+연결 키는 `(source, source_service_id)`이며 ID와 이름도 검증합니다.
+010=신체건강, 020=정신건강, 080=임신·출산이고 복수 코드를 유지합니다.
+이 컬럼은 선별에 사용한 세 주제만 담으며 원문의 다른 주제까지 담지는 않습니다.
+
+2026-10-20 적용: 770건, 코드별 010 274건 / 020 53건 / 080 504건.
+복수 분류로 코드별 합계에는 중복이 있습니다. 기존 16컬럼과 행 수는 변함없습니다.
+변경 전 전체 행은 `data/backups/*_themes/healty_benefit.json`에 보관합니다.
+검증과 갱신은 하나의 트랜잭션이며 실패하면 DB 변경을 롤백합니다.
+코드는 필수이며 허용 코드 검사 제약조건과 배열 검색용 GIN 인덱스를 추가합니다.
+기존 생성 스크립트는 16컬럼 복사본을 만들므로 새로 생성할 경우 이 보충
+스크립트도 실행해야 합니다. 자동 동기화나 화면 필터는 아직 구현하지 않았습니다.
+
+```sql
+-- 신체건강
+SELECT * FROM public.healty_benefit WHERE theme_codes @> ARRAY['010']::text[];
+-- 신체건강 또는 정신건강
+SELECT * FROM public.healty_benefit WHERE theme_codes && ARRAY['010','020']::text[];
+```
+
 목록과 상세는 모두 public.benefit에 저장합니다. 기본키는 자동 생성 id,
 중복 방지 키는 (source, source_service_id)입니다. source는 central/local입니다.
 
