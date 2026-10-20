@@ -1,0 +1,2 @@
+-- 폐기된 지역 테이블을 재생성하지 않습니다. 단일 benefit 스키마를 사용합니다.
+-- provider_province/provider_municipality는 제공기관 지역이며 거주 자격 판정이 아닙니다.
