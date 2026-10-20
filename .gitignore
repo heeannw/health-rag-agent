@@ -1,12 +1,46 @@
-.env
-
 # API 원문, 수집 기록, 검증 보고서 및 DB JSON 백업 (로컬 보관)
 /새 폴더/data/
-
-# Python 실행 캐시
-__pycache__/
-*.py[cod]
 
 # PostgreSQL 백업 파일
 *.backup
 *.dump
+
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*.pyc
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Environment variables / secrets
+.env
+.env.*
+!.env.example
+*.key
+
+# Data (raw/large files should not be committed)
+*.csv
+*.xlsx
+*.sav
+!**/sample*.csv
+_*_output.json
+
+# Vector DB / model artifacts
+*.faiss
+*.index
+chroma_db/
+*.pkl
+*.pt
+*.ckpt
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
