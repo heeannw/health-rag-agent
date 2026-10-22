@@ -3,7 +3,7 @@ import json
 import os
 import psycopg
 from dotenv import load_dotenv
-from collect_many import BASE
+from health_benefits.collection.collect_many import BASE
 
 COLUMNS = ['id','source','source_service_id','name','target_text','summary_text',
            'criteria_text','source_url','provider_province','provider_municipality',

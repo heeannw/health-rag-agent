@@ -1,7 +1,7 @@
 import unittest
 from datetime import date
 from xml.etree import ElementTree as ET
-from application_period import extract_period
+from health_benefits.preprocessing.application_period import extract_period
 
 class PeriodTest(unittest.TestCase):
     def parse(self, text):

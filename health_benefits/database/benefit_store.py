@@ -1,6 +1,6 @@
 """목록과 상세를 단일 benefit 테이블에 저장하는 공통 함수."""
 from datetime import datetime, timezone
-from application_period import extract_period
+from health_benefits.preprocessing.application_period import extract_period
 
 
 def text_of(root, tag):

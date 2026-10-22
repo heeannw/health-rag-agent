@@ -1,4 +1,49 @@
+> 실행 예시는 저장소 루트 기준입니다. 파일별 새 위치와 실행 방법은 [README](../README.md)를 참고하세요.
+
 # 단일 benefit 테이블
+
+## 파이썬 의료 혜택 필터 추출
+
+`search_benefits.py`는 `.env`로 연결한 `public.healty_benefit`을 읽기 전용으로
+조회하고 생애주기·대상특성·제공기관 지역을 파이썬에서 필터링합니다.
+DB와 원본 NULL은 변경하지 않습니다. 별도 패키지 `psycopg[binary]`,
+`python-dotenv`가 필요하며 `--input` 사용 시 표준 라이브러리만으로 실행됩니다.
+
+저장소 루트에서 실행:
+
+```powershell
+python health_benefits/run.py search --life-cycle 청년 --target-group 장애인 --province 서울특별시
+python health_benefits/run.py search --life-cycle 영유아 --life-cycle 아동
+python health_benefits/run.py search --province 전국
+python health_benefits/run.py search --input benefits.json --life-cycle 청년 --output result.json
+python -m unittest discover -s health_benefits/tests -p test_search_benefits.py
+```
+
+각 옵션을 생략하면 해당 분류를 제한하지 않습니다. 화면의 ‘전체’ 선택은 옵션 생략에
+해당합니다. `--province 전국`은 명시적 전국 항목을 선택하며 지역 필터 생략과 다릅니다.
+분류명과 지역명은 DB 원문명과 정확히 일치해야 합니다. 같은 분류의 반복 옵션은 OR,
+생애주기·대상특성·지역 사이는 AND입니다. 시군구 선택에는 시도가 필요합니다.
+
+기본 결과 파일은 `health_benefits/data/exports/filtered_benefits.json`이며 다시 실행하면
+덮어씁니다. 다른 결과를 보관하려면 `--output`을 지정합니다. 입력 JSON은 행 객체 배열입니다.
+
+- `matched`: 선택한 분류에 일치한 후보입니다. 신청 자격 확정을 의미하지 않습니다.
+- `needs_review`: 알려진 불일치는 없지만 선택 조건의 정보가 없어 원문 확인이 필요한 후보입니다.
+- 알려진 조건이 하나라도 불일치하면 두 목록 모두에서 제외합니다.
+- 원본 필드는 그대로 보존하며 `display.life_cycle`, `display.target_group`,
+  `display.region`에 화면 표시 문구를 제공합니다. NULL·빈 배열은 ‘대상 원문 확인’입니다.
+- 생애주기·대상특성의 명시적 `전체`/`전체 대상`만 전체로 인정합니다.
+  NULL을 ‘전 연령 지원’ 또는 전체 대상으로 바꾸지 않습니다.
+- `region_scope`는 `nationwide`/`regional`/`unknown`입니다. 시도가 `전국`이고
+  시군구가 없거나 `전국`인 경우만 전국으로 인정합니다. 중앙 사업 또는 지역 NULL이라는
+  이유로 전국으로 추정하지 않습니다. 특정 지역 검색에는 명시적인 전국 항목도 포함합니다.
+- 시군구가 NULL이면 시도 전체 지원이라고 추정하지 않습니다. 해당 시군구 검색에서는
+  원문 확인 후보로 분리합니다. 제공기관 지역은 실제 신청자의 거주 요건과 다를 수 있습니다.
+- 필터를 생략한 분류의 NULL은 후보를 제외하지 않지만 표시 문구는 계속 원문 확인입니다.
+  `filter_status`는 선택 조건별 판정, `review_fields`는 미확인인 선택 조건입니다.
+
+기존 수집/보충 스크립트 → `healty_benefit` → `search_benefits.py` → 결과 JSON 순서로
+연결됩니다. 화면은 아직 연결하지 않았으며 JSON의 표시 문구를 사용할 수 있습니다.
 
 ## 생애주기·대상특성 보충
 
@@ -64,11 +109,11 @@ detail_collected_at은 상세를 마지막으로 수집한 시각입니다.
 provider 지역은 제공기관 지역이며 신청자 거주 요건과 동일하지 않습니다.
 
 ```powershell
-python collect_catalog.py --source central
-python collect_catalog.py --source local
-python collect_many.py --source central --limit 0 --max-calls 1000 --refresh --skip-collected-today
-python collect_many.py --source local --limit 0 --max-calls 1100 --refresh --skip-collected-today
-python verify_collection.py
+python health_benefits/run.py collect_catalog --source central
+python health_benefits/run.py collect_catalog --source local
+python health_benefits/run.py collect_many --source central --limit 0 --max-calls 1000 --refresh --skip-collected-today
+python health_benefits/run.py collect_many --source local --limit 0 --max-calls 1100 --refresh --skip-collected-today
+python health_benefits/run.py verify_collection
 ```
 
 collect_catalog.py는 목록 컬럼만 갱신합니다. 상세 내용과 상세 수집 시각은 유지합니다.
@@ -106,7 +151,7 @@ SELECT name, application_start_date, application_deadline, application_status,
        application_period_text, status_checked_at FROM benefit;
 ```
 
-기존 XML 보충: python backfill_application_status.py (DB 백업 후 기존 상세 본문과 일치하는 XML만 적용).
+기존 XML 보충: python health_benefits/run.py backfill_application_status (DB 백업 후 기존 상세 본문과 일치하는 XML만 적용).
 현재 스키마는 총 18컬럼이며 이전 문단의 13개는 기본 컬럼입니다.
 
 ## 의료 관련 별도 테이블: healty_benefit

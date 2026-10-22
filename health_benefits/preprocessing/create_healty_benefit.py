@@ -8,7 +8,7 @@ import psycopg
 from psycopg import sql
 from dotenv import load_dotenv
 
-from collect_many import BASE, parse_xml, text_of
+from health_benefits.collection.collect_many import BASE, parse_xml, text_of
 
 THEMES = {"010": "신체건강", "020": "정신건강", "080": "임신·출산"}
 EXCLUDED = {"collected_at", "detail_collected_at"}

@@ -4,15 +4,14 @@ import json
 import os
 import time
 from datetime import datetime, timezone
-from pathlib import Path
 
 import psycopg
 import requests
 from defusedxml import ElementTree as ET
 from dotenv import load_dotenv
-from benefit_store import save_listing, save_detail
+from health_benefits.database.benefit_store import save_listing, save_detail
 
-BASE = Path(__file__).resolve().parent
+from health_benefits.paths import BASE
 URL = "https://apis.data.go.kr/B554287/NationalWelfareInformationsV001/"
 LOCAL_URL = "https://apis.data.go.kr/B554287/LocalGovernmentWelfareInformations/"
 

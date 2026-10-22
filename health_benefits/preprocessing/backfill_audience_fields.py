@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 import psycopg
 from dotenv import load_dotenv
 
-from create_healty_benefit import BASE, THEMES, parse_xml, text_of
+from health_benefits.preprocessing.create_healty_benefit import BASE, THEMES, parse_xml, text_of
 
 
 def main():

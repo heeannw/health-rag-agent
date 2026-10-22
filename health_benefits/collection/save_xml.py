@@ -3,8 +3,8 @@ import os
 from datetime import datetime, timezone
 import psycopg
 from dotenv import load_dotenv
-from collect_many import BASE, parse_xml, text_of
-from benefit_store import save_listing, save_detail
+from health_benefits.collection.collect_many import BASE, parse_xml, text_of
+from health_benefits.database.benefit_store import save_listing, save_detail
 
 
 def main():

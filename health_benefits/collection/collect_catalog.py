@@ -9,8 +9,8 @@ import psycopg
 import requests
 from dotenv import load_dotenv
 
-from collect_many import BASE, URL, LOCAL_URL, parse_xml, text_of
-from benefit_store import save_listing
+from health_benefits.collection.collect_many import BASE, URL, LOCAL_URL, parse_xml, text_of
+from health_benefits.database.benefit_store import save_listing
 
 
 def main():

@@ -4,8 +4,8 @@ import os
 from datetime import datetime, timezone
 import psycopg
 from dotenv import load_dotenv
-from collect_many import BASE, parse_xml, text_of
-from application_period import extract_period
+from health_benefits.collection.collect_many import BASE, parse_xml, text_of
+from health_benefits.preprocessing.application_period import extract_period
 
 
 def norm(v):
@@ -34,7 +34,7 @@ def main():
         folder = BASE / 'data' / 'backups' / datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ_status')
         folder.mkdir(parents=True)
         (folder / 'benefit.json').write_text(json.dumps(snapshot,ensure_ascii=False),encoding='utf-8')
-        conn.execute((BASE / 'application_status.sql').read_text(encoding='utf-8'))
+        conn.execute((BASE / 'database/sql/application_status.sql').read_text(encoding='utf-8'))
         matched = 0
         for row in conn.execute('SELECT id,source,source_service_id,name,target_text,criteria_text,benefit_text FROM benefit WHERE detail_collected_at IS NOT NULL').fetchall():
             key = tuple(norm(v) for v in row[1:])

@@ -3,8 +3,8 @@ import os
 from datetime import datetime, timedelta, timezone
 import psycopg
 from dotenv import load_dotenv
-from collect_many import BASE, parse_xml
-from benefit_store import save_listing, save_detail
+from health_benefits.collection.collect_many import BASE, parse_xml
+from health_benefits.database.benefit_store import save_listing, save_detail
 
 
 def main():
@@ -12,7 +12,7 @@ def main():
     with psycopg.connect(host=os.environ['PGHOST'], port=os.environ['PGPORT'],
                          dbname=os.environ['PGDATABASE'], user=os.environ['PGUSER'],
                          password=os.environ['PGPASSWORD'], connect_timeout=10) as conn:
-        conn.execute((BASE / 'benefit_schema.sql').read_text(encoding='utf-8').replace(
+        conn.execute((BASE / 'database/sql/benefit_schema.sql').read_text(encoding='utf-8').replace(
             'CREATE TABLE benefit', 'CREATE TEMP TABLE benefit'))
         listing = parse_xml('<servList><servId>TEST</servId><servNm>혜택</servNm><servDgst>요약</servDgst><ctpvNm>서울</ctpvNm></servList>')
         detail = parse_xml('<detail><servId>TEST</servId><servNm>혜택</servNm><sprtTrgtCn>지역 대상</sprtTrgtCn><tgtrDtlCn>중앙 대상</tgtrDtlCn><slctCritCn>기준</slctCritCn><alwServCn>금액</alwServCn></detail>')

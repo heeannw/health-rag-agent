@@ -1,5 +1,5 @@
 import os
-from pathlib import Path
+from health_benefits.paths import BASE
 
 from dotenv import load_dotenv
 
@@ -12,12 +12,12 @@ BASE_URL = (
     "NationalWelfareInformationsV001"
 )
 
-# 실행 위치와 관계없이 이 파이썬 파일 옆에 data 폴더를 만듭니다.
-DATA_DIR = Path(__file__).resolve().parent / "data"
+# 실행 위치와 관계없이 health_benefits 아래에 data 폴더를 만듭니다.
+DATA_DIR = BASE / "data"
 DATA_DIR.mkdir(exist_ok=True)
 
 load_dotenv(
-    dotenv_path=Path(__file__).resolve().parent / ".env",
+    dotenv_path=BASE / ".env",
     override=True,
 )
 

@@ -2,13 +2,12 @@
 import json
 import os
 from datetime import datetime, timezone
-from pathlib import Path
 
 import psycopg
 from psycopg import sql
 from dotenv import load_dotenv
 
-BASE = Path(__file__).resolve().parent
+from health_benefits.paths import BASE
 TABLES = ("benefits", "benefit_catalog", "regions", "benefit_regions")
 EXPECTED = """
     SELECT COALESCE(b.id, (SELECT COALESCE(max(id),0) FROM benefits) +
@@ -46,7 +45,7 @@ def main():
             if json.loads(path.read_text(encoding="utf-8")) != payload:
                 raise RuntimeError("백업 검증 실패")
             before[table] = len(rows)
-        conn.execute((BASE / "benefit_schema.sql").read_text(encoding="utf-8"))
+        conn.execute((BASE / "database/sql/benefit_schema.sql").read_text(encoding="utf-8"))
         conn.execute("CREATE TEMP TABLE expected_benefit ON COMMIT DROP AS " + EXPECTED)
         conn.execute("INSERT INTO benefit (id,source,source_service_id,name,target_text,summary_text,criteria_text,source_url,provider_province,provider_municipality,collected_at,benefit_text,detail_collected_at) OVERRIDING SYSTEM VALUE SELECT * FROM expected_benefit")
         mismatch = conn.execute("""
