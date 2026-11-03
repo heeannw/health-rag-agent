@@ -6,13 +6,15 @@
 
 from math import asin, cos, radians, sin, sqrt
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.schemas import Benefit, ChatRequest, ChatResponse, Facility, Region
+from app.schemas import BenefitsResponse, ChatRequest, ChatResponse, Facility, Region
+from app.services import benefits as benefit_search
 from app.services import rag
-from app.services.sample_data import BENEFITS, FACILITIES, REGIONS
+from app.services.facilities import FACILITIES, REGIONS
 
 app = FastAPI(title="건강 정보·의료 혜택 AI 에이전트 API")
 
@@ -22,6 +24,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(rag.RagUnavailable)
+@app.exception_handler(benefit_search.BenefitsUnavailable)
+async def unavailable(_: Request, exc: Exception):
+    # 연결된 담당 모듈(RAG·혜택 DB)을 못 쓰면 503으로 사유를 알려준다
+    return JSONResponse(status_code=503, content={"detail": str(exc)})
 
 
 def _split(value: str | None) -> list[str]:
@@ -46,30 +55,27 @@ async def chat(req: ChatRequest):
     return await run_in_threadpool(rag.ask, req.query, req.n_results, req.region)
 
 
-# TODO(가은 API 연동): 아래 엔드포인트는 샘플 데이터. 매칭 로직/DB 연결되면 교체.
+# 지역은 data/regions.json, 혜택은 health_benefits 검색, 기관은 data/facilities.json.
 @app.get("/api/regions", response_model=list[Region])
 def regions():
     return REGIONS
 
 
-@app.get("/api/benefits", response_model=list[Benefit])
-def benefits(
+@app.get("/api/benefits", response_model=BenefitsResponse)
+async def benefits(
     province: str | None = None,
     municipality: str | None = None,
-    life_cycle: str | None = Query(None, description="예: 노년, 청년, 임신·출산"),
+    life_cycle: str | None = Query(None, description="쉼표 구분 생애주기(OR). 예: 노년, 청년, 임신·출산"),
+    target_group: str | None = Query(None, description="쉼표 구분 대상특성(OR). 예: 장애인"),
     themes: str | None = Query(None, description="쉼표 구분 주제코드. 예: 010,020"),
 ):
-    result = BENEFITS
-    if province:
-        # 중앙부처(central) 혜택은 지역 제한 없이 항상 포함
-        result = [b for b in result if b["source"] == "central" or b["provider_province"] == province]
-    if municipality:
-        result = [b for b in result if b["source"] == "central" or b["provider_municipality"] == municipality]
-    if life_cycle:
-        result = [b for b in result if life_cycle in b["life_cycle_names"]]
-    if theme_list := _split(themes):
-        result = [b for b in result if set(theme_list) & set(b["theme_codes"])]
-    return result
+    if municipality and not province:
+        raise HTTPException(400, "시군구를 선택하려면 시도를 함께 입력하세요.")
+    # 첫 호출은 DB 조회라 스레드풀에서 실행
+    return await run_in_threadpool(
+        benefit_search.search,
+        province, municipality, _split(life_cycle), _split(target_group), _split(themes),
+    )
 
 
 @app.get("/api/facilities", response_model=list[Facility])
@@ -80,6 +86,7 @@ def facilities(
     municipality: str | None = None,
     lat: float | None = Query(None, description="거리 기준점 위도"),
     lng: float | None = Query(None, description="거리 기준점 경도"),
+    radius_km: float | None = Query(None, gt=0, description="기준점에서 이 거리 안의 기관만 (lat·lng 필요)"),
 ):
     result = FACILITIES
     if type_list := _split(types):
@@ -95,6 +102,8 @@ def facilities(
             {**f, "distance_km": round(_distance_km(lat, lng, f["lat"], f["lng"]), 1)} if f.get("lat") else f
             for f in result
         ]
+        if radius_km is not None:
+            result = [f for f in result if f.get("distance_km") is not None and f["distance_km"] <= radius_km]
         result.sort(key=lambda f: f.get("distance_km") if f.get("distance_km") is not None else float("inf"))
     return result
 

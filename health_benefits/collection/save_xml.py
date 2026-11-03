@@ -8,7 +8,7 @@ from health_benefits.database.benefit_store import save_listing, save_detail
 
 
 def main():
-    load_dotenv(BASE / '.env', override=True)
+    load_dotenv(BASE.parent / '.env', override=True)
     path = BASE / 'data' / 'welfare_detail.xml'
     listing_path = BASE / 'data' / 'welfare_list.xml'
     detail = parse_xml(path.read_bytes())

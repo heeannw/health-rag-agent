@@ -18,35 +18,55 @@ class Source(BaseModel):
 class ChatResponse(BaseModel):
     answer: str
     sources: list[Source]
-    mock: bool = False  # RAG 모듈을 못 불러와 샘플 응답을 돌려준 경우 True
 
 
 class Region(BaseModel):
     province: str
-    municipality: str
+    municipality: str | None = None  # None이면 시도 전체
     lat: float  # 거리 계산 기준점 (시군구청 근처)
     lng: float
 
 
+class BenefitDisplay(BaseModel):
+    """search_benefits가 만들어 주는 화면 표시 문구. 값이 없으면 '대상 원문 확인'."""
+
+    life_cycle: str
+    target_group: str
+    region: str
+
+
 class Benefit(BaseModel):
-    """가은 health-benefits 브랜치의 benefit / healty_benefit 테이블 컬럼 기준."""
+    """가은 health_benefits의 healty_benefit 테이블 컬럼 + search_benefits 판정 결과."""
 
     id: int
     source: str  # central | local
     name: str
     summary_text: str | None = None
+    target_text: str | None = None
     criteria_text: str | None = None  # 소득 등 공식 선정기준 (사용자에게 묻지 않고 그대로 노출)
+    benefit_text: str | None = None
     source_url: str | None = None
     provider_province: str | None = None
     provider_municipality: str | None = None
-    life_cycle_names: list[str] = []
-    target_group_names: list[str] = []
+    life_cycle_names: list[str] | None = None  # NULL은 '전체 대상'이 아니라 원문 미확인
+    target_group_names: list[str] | None = None
     theme_codes: list[str] = []  # 010 신체건강 | 020 정신건강 | 080 임신·출산
     application_status: str = "unknown"  # unknown | scheduled | open | closed
-    apply_method: str | None = None  # 신청 방법·장소
-    documents: str | None = None     # 구비서류
-    legal_basis: str | None = None   # 근거법령
+    application_start_date: str | None = None
+    application_deadline: str | None = None
+    apply_method: str | None = None  # 신청 방법·장소 (아직 DB 컬럼 없음)
+    documents: str | None = None     # 구비서류 (아직 DB 컬럼 없음)
+    legal_basis: str | None = None   # 근거법령 (아직 DB 컬럼 없음)
     related_facility_type: str | None = None  # 이 혜택을 받으러 가는 기관 유형 (지도 연결용)
+    display: BenefitDisplay
+    region_scope: str  # nationwide | regional | unknown
+    review_fields: list[str] = []  # 선택한 조건 중 원문 정보가 없어 확인이 필요한 항목
+
+
+class BenefitsResponse(BaseModel):
+    matched: list[Benefit]       # 선택한 조건과 분류가 일치
+    needs_review: list[Benefit]  # 불일치는 없지만 조건 정보가 없어 원문 확인이 필요
+    notice: str
 
 
 class Facility(BaseModel):

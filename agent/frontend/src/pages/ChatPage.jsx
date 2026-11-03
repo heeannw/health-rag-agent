@@ -60,7 +60,7 @@ export default function ChatPage() {
     })
     try {
       const res = await askChat(query, regionLabel)
-      setMessages((m) => [...m, { role: 'bot', text: res.answer, sources: res.sources, mock: res.mock }])
+      setMessages((m) => [...m, { role: 'bot', text: res.answer, sources: res.sources }])
     } catch (e) {
       setMessages((m) => [...m, { role: 'bot', text: `오류가 발생했어요: ${e.message}`, sources: [] }])
     } finally {
@@ -118,7 +118,6 @@ export default function ChatPage() {
                 <div className={`bubble ${m.role === 'bot' ? 'glass' : ''}`}>
                   {m.role === 'bot' && (
                     <div className="answer-meta">
-                      {m.mock && <span className="tag pink">샘플 응답</span>}
                       <span>에이전트 답변 · 근거 {m.sources?.length ?? 0}건</span>
                     </div>
                   )}

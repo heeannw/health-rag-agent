@@ -293,6 +293,15 @@ a { color: inherit; }
 }
 .region-select select { flex: 1; min-width: 0; border: none; background: transparent; font-size: 14px; font-weight: 700; color: var(--text); }
 .region-select select:focus { outline: none; }
+.locate-btn {
+  display: grid; place-items: center; width: 28px; height: 28px; flex: none; padding: 0;
+  border: none; border-radius: 8px; background: rgba(113, 186, 246, 0.18); color: var(--blue-ink); cursor: pointer;
+}
+.locate-btn:hover:not(:disabled) { background: rgba(113, 186, 246, 0.32); }
+.locate-btn:disabled { cursor: default; }
+.region-hint { font-size: 11px; color: var(--muted); line-height: 1.4; }
+.spin { animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 
 /* ── 챗봇 추가 요소 ───────────────────────── */
 .chat-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; }
@@ -358,6 +367,8 @@ a { color: inherit; }
 .benefit-facts dt { font-weight: 700; color: var(--muted); }
 .benefit-facts dd { margin: 0; line-height: 1.5; }
 .benefit-facts dd.hl { padding: 2px 8px; border-radius: 6px; background: rgba(215, 246, 247, 0.9); justify-self: start; }
+.clamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.more-btn { display: block; margin-top: 4px; padding: 0; border: none; background: none; font-size: 12px; font-weight: 700; color: var(--blue-ink); cursor: pointer; }
 .benefit-cta {
   display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-radius: var(--r-sm);
   background: var(--accent-blue); color: #0B2A44; font-size: 14px; font-weight: 700; text-decoration: none;
@@ -365,6 +376,8 @@ a { color: inherit; }
 }
 .benefit-cta:hover { filter: brightness(0.96); }
 .data-source { margin-top: 24px; font-size: 12px; color: var(--muted); text-align: right; }
+.data-source.map-source { margin: 0; padding: 10px 20px 14px; text-align: left; line-height: 1.5; }
+.grade-hint { display: block; width: 100%; margin-top: 4px; font-size: 11px; font-weight: 500; color: var(--muted); }
 
 /* ── 지도 추가 요소 ───────────────────────── */
 .search {

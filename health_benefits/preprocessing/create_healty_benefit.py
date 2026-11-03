@@ -45,7 +45,7 @@ def load_themes():
 
 def main():
     records = load_themes()
-    load_dotenv(BASE / ".env", override=True)
+    load_dotenv(BASE.parent / ".env", override=True)
     host = os.environ["PGHOST"]
     if not host.endswith(".supabase.com"):
         raise ValueError("설정된 Supabase 클라우드 호스트인지 확인이 필요합니다.")

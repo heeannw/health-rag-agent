@@ -17,7 +17,7 @@ DATA_DIR = BASE / "data"
 DATA_DIR.mkdir(exist_ok=True)
 
 load_dotenv(
-    dotenv_path=BASE / ".env",
+    dotenv_path=BASE.parent / ".env",
     override=True,
 )
 

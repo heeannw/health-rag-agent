@@ -1,6 +1,10 @@
 async function request(path, options) {
   const res = await fetch(path, options)
-  if (!res.ok) throw new Error(`${res.status} ${await res.text()}`)
+  if (!res.ok) {
+    // FastAPI 오류는 {detail: ...} 로 온다
+    const body = await res.json().catch(() => null)
+    throw new Error(typeof body?.detail === 'string' ? body.detail : `요청 실패 (${res.status})`)
+  }
   return res.json()
 }
 
@@ -39,5 +43,4 @@ export const SOURCE_LABELS = {
   dementia_center: '전국치매센터 표준데이터',
   ltc_institution: '장기요양기관',
   ltc_institution_search: '장기요양기관',
-  mock: '샘플',
 }

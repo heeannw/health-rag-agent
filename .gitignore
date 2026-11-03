@@ -47,3 +47,7 @@ Thumbs.db
 .vscode/
 
 
+
+# 지도 기관 수집 원문·좌표 캐시 (scripts/collect_facilities.py)
+/agent/backend/data/raw/
+/agent/backend/data/geocode_cache.json

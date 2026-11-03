@@ -35,7 +35,7 @@ def main():
             raise ValueError("중복 추출 근거")
         expected[key] = (item["id"], item["name"], codes)
 
-    load_dotenv(BASE / ".env", override=True)
+    load_dotenv(BASE.parent / ".env", override=True)
     if not os.environ["PGHOST"].endswith(".supabase.com"):
         raise ValueError("Supabase 클라우드 연결 설정 확인 필요")
     with psycopg.connect(

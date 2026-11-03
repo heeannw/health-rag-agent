@@ -84,7 +84,7 @@ def load_database():
     import psycopg
     from dotenv import load_dotenv
 
-    load_dotenv(BASE / ".env")
+    load_dotenv(BASE.parent / ".env")
     with psycopg.connect(
         host=os.environ["PGHOST"], port=os.environ["PGPORT"],
         dbname=os.environ["PGDATABASE"], user=os.environ["PGUSER"],

@@ -17,7 +17,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", choices=("central", "local"), required=True)
     args = parser.parse_args()
-    load_dotenv(BASE / ".env", override=True)
+    load_dotenv(BASE.parent / ".env", override=True)
     local = args.source == "local"
     endpoint = (LOCAL_URL + "LcgvWelfarelist" if local else URL + "NationalWelfarelistV001")
     run_dir = BASE / "data" / "batches" / (datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ") + "_catalog_" + args.source)

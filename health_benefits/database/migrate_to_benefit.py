@@ -25,7 +25,7 @@ EXPECTED = """
 
 
 def main():
-    load_dotenv(BASE / ".env", override=True)
+    load_dotenv(BASE.parent / ".env", override=True)
     with psycopg.connect(host=os.environ["PGHOST"], port=os.environ["PGPORT"],
                          dbname=os.environ["PGDATABASE"], user=os.environ["PGUSER"],
                          password=os.environ["PGPASSWORD"], connect_timeout=10) as conn:

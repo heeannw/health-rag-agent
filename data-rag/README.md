@@ -26,9 +26,8 @@
 ## 폴더 구조
 ```
 data-rag/
-├── config.py              # .env에서 API 키 로드
+├── config.py              # 저장소 루트 .env에서 API 키 로드
 ├── requirements.txt
-├── .env.example           # 필요한 키 목록 (실제 키는 .env에 본인이 채워넣기)
 ├── collectors/              # 소스별 공공데이터 API 클라이언트
 │   ├── base.py              # 공통 요청 헬퍼 (XML/JSON/odcloud)
 │   ├── law.py               # 법제처 법령정보
@@ -63,7 +62,7 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-`.env.example`을 참고해서 `.env` 파일을 만들고 본인이 발급받은 API 키를 채워 넣는다 (`.env`는 git에 커밋되지 않음).
+저장소 루트의 `.env.example`을 참고해서 루트에 `.env` 파일을 만들고 본인이 발급받은 API 키를 채워 넣는다 (`.env`는 git에 커밋되지 않음).
 ```
 DATA_GO_KR_API_KEY=...
 GEMINI_API_KEY=...

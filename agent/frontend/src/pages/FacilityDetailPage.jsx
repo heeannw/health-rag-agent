@@ -22,7 +22,7 @@ export default function FacilityDetailPage() {
         setFacility(f)
         // 기관 지역에서 받을 수 있는 혜택 중 이 기관 유형과 연결된 것 우선
         // (기관-혜택 직접 매핑은 가은 데이터 확정 후 교체)
-        return getBenefits({ province: f.province, municipality: f.municipality }).then((list) => {
+        return getBenefits({ province: f.province, municipality: f.municipality }).then(({ matched: list }) => {
           const linked = list.filter((b) => b.related_facility_type === f.type)
           return linked.length ? linked : list
         })
@@ -95,7 +95,10 @@ export default function FacilityDetailPage() {
           {facility.grades.length > 0 && (
             <li>
               <Info size={18} strokeWidth={1.8} /><span>평가등급</span>
-              <strong className="grades">{facility.grades.map((g) => <span key={g} className="tag blue">{g}</span>)}</strong>
+              <strong className="grades">
+                {facility.grades.map((g) => <span key={g} className="tag blue">{g}</span>)}
+                <small className="grade-hint">건강보험심사평가원 적정성 평가 · 1등급이 가장 우수</small>
+              </strong>
             </li>
           )}
         </ul>

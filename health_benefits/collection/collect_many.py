@@ -53,7 +53,7 @@ def main():
     if args.limit < 0 or args.max_calls < 1:
         parser.error("limit은 0 이상, max-calls는 1 이상이어야 합니다.")
 
-    load_dotenv(BASE / ".env", override=True)
+    load_dotenv(BASE.parent / ".env", override=True)
     required = ["DATA_GO_KR_SERVICE_KEY", "PGHOST", "PGPORT", "PGDATABASE", "PGUSER", "PGPASSWORD"]
     missing = [key for key in required if not os.environ.get(key)]
     if missing:
