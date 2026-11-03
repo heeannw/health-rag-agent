@@ -1,5 +1,6 @@
 # API 원문, 수집 기록, 검증 보고서 및 DB JSON 백업 (로컬 보관)
 /새 폴더/data/
+/health_benefits/data/
 
 # PostgreSQL 백업 파일
 *.backup
@@ -44,3 +45,5 @@ chroma_db/
 Thumbs.db
 .idea/
 .vscode/
+
+
