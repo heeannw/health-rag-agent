@@ -15,11 +15,12 @@ const qs = (params) => {
   return entries.length ? `?${new URLSearchParams(entries)}` : ''
 }
 
-export const askChat = (query, region) =>
+/** history: 같은 대화의 이전 메시지 [{ role: 'user'|'assistant', content }] (오래된 것부터) */
+export const askChat = (query, region, history = []) =>
   request('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, region: region || null }),
+    body: JSON.stringify({ query, region: region || null, history }),
   })
 
 export const getRegions = () => request('/api/regions')

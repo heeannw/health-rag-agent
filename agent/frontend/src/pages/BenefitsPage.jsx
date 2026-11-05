@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   ArrowRight, ArrowUpRight, Baby, Brain, Briefcase, FileSearch, GraduationCap, HeartPulse, Info, Landmark, MapPin,
-  School, Smile, Sparkle, Users,
+  FileDown, School, Smile, Sparkle, Users,
 } from 'lucide-react'
 import { getBenefits } from '../api.js'
 import { FACILITY_META } from '../facilityTypes.js'
@@ -150,9 +150,11 @@ function BenefitCard({ b, no }) {
         <dt>대상</dt><dd>{audienceOf(b)}</dd>
         {b.criteria_text && <><dt>공식 기준</dt><dd className="hl"><ClampText text={b.criteria_text} /></dd></>}
         {period && <><dt>신청기간</dt><dd>{period}</dd></>}
-        {b.apply_method && <><dt>신청</dt><dd>{b.apply_method}</dd></>}
-        {b.documents && <><dt>구비서류</dt><dd>{b.documents}</dd></>}
-        {b.legal_basis && <><dt>근거법령</dt><dd>{b.legal_basis}</dd></>}
+        {b.application_method && <><dt>신청</dt><dd>{b.application_method}</dd></>}
+        {b.application_forms?.length > 0 && (
+          <><dt>서식</dt><dd className="form-links">{b.application_forms.map((f) => <FormLink key={f.name + f.link} form={f} />)}</dd></>
+        )}
+        {b.legal_basis?.length > 0 && <><dt>근거법령</dt><dd>{b.legal_basis.join(', ')}</dd></>}
       </dl>
       <div className="benefit-foot">
         <span>
@@ -170,6 +172,14 @@ function BenefitCard({ b, no }) {
       )}
     </li>
   )
+}
+
+// 신청 서식은 복지로 첨부파일 링크. http(s) 링크만 걸고 나머지는 이름만 보여준다
+function FormLink({ form }) {
+  const safe = /^https?:\/\//.test(form.link ?? '')
+  return safe
+    ? <a href={form.link} target="_blank" rel="noreferrer"><FileDown size={13} />{form.name}</a>
+    : <span>{form.name}</span>
 }
 
 // 선정기준 원문은 최대 1,500자 넘게 길어서 3줄까지만 보여주고 펼칠 수 있게 한다

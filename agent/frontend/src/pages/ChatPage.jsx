@@ -1,10 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
-  ArrowRight, ArrowUp, Baby, Brain, FileText, Gift, HeartPulse, History, MapPinned, Sparkles, Stethoscope,
+  ArrowUp, Baby, Brain, FileText, Gift, HeartPulse, History, MapPinned, Sparkles, Stethoscope, X,
 } from 'lucide-react'
+import Markdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { SOURCE_LABELS, askChat } from '../api.js'
 import { useRegion } from '../region.jsx'
+import { useChatHistory } from '../chatHistory.jsx'
+import ConversationList from '../components/ConversationList.jsx'
+
+const NO_MESSAGES = []
 
 const EXAMPLES = [
   { icon: HeartPulse, tone: 'blue', title: '어르신 의료 혜택', query: '65세 이상 받을 수 있는 의료 혜택 뭐 있어?' },
@@ -13,32 +19,25 @@ const EXAMPLES = [
   { icon: Stethoscope, tone: 'blue', title: '법·제도', query: '고혈압 관련 법 제도 알려줘' },
 ]
 
-const RECENT_KEY = 'health-agent:recent-questions'
-
-function loadRecent() {
-  try {
-    return JSON.parse(localStorage.getItem(RECENT_KEY)) ?? []
-  } catch {
-    return []
-  }
-}
-
-function saveRecent(list) {
-  try {
-    localStorage.setItem(RECENT_KEY, JSON.stringify(list))
-  } catch {
-    // 저장 불가 환경이면 무시
-  }
-}
-
 /** 인용 출처 한 건의 보조 설명 (근거법령 > 소관부처 > 출처 종류) */
 const sourceNote = (s) => s.metadata?.근거법령 || s.metadata?.소관부처 || s.metadata?.주소 || ''
 
+/** LLM 답변 끝의 '[출처]' 목록은 아래 출처 칩·인용 패널과 겹쳐서 뗀다 */
+const stripSourceList = (text) => text.replace(/\n+(-{3,}\s*\n+)?\[출처\][\s\S]*$/, '').trim()
+
+/** 저장된 메시지 → API에 보낼 이전 대화 (최근 10개, 오류 답변 제외) */
+const toHistory = (messages) =>
+  messages
+    .filter((m) => !m.error)
+    .slice(-10)
+    .map((m) => ({ role: m.role === 'bot' ? 'assistant' : 'user', content: m.role === 'bot' ? stripSourceList(m.text) : m.text }))
+
 export default function ChatPage() {
-  const [messages, setMessages] = useState([])
+  const { active, create, append, pending, setPendingFor, startNew } = useChatHistory()
+  const messages = active?.messages ?? NO_MESSAGES
+  const loading = active ? pending.has(active.id) : false
   const [input, setInput] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [recent, setRecent] = useState(loadRecent)
+  const [drawerOpen, setDrawerOpen] = useState(false)
   const endRef = useRef(null)
   const { label: regionLabel, shortLabel } = useRegion()
   const [params, setParams] = useSearchParams()
@@ -48,25 +47,35 @@ export default function ChatPage() {
     endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
   }, [messages, loading])
 
-  const send = useCallback(async (query) => {
-    if (!query.trim() || loading) return
-    setMessages((m) => [...m, { role: 'user', text: query }])
+  // 챗봇 화면에 들어오면 이전 대화 대신 항상 새 대화로 시작
+  useEffect(() => { startNew() }, [startNew])
+
+  // 다른 대화를 열면 맨 아래(최근 메시지)로
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ block: 'end' })
+  }, [active?.id])
+
+  const send = useCallback(async (query, { fresh = false } = {}) => {
+    if (!query.trim() || (loading && !fresh)) return
+    // 열린 대화가 있으면 그 대화에 이어서, 없거나 fresh면 새 대화로 저장
+    const continuing = active && !fresh
+    const id = continuing ? active.id : create(query)
+    // 이전 대화를 같이 보내야 "신청은 어떻게 해?" 같은 후속 질문을 이해한다. 오류 답변은 뺀다
+    const history = continuing ? toHistory(active.messages) : []
+    append(id, { role: 'user', text: query })
     setInput('')
-    setLoading(true)
-    setRecent((prev) => {
-      const next = [query, ...prev.filter((q) => q !== query)].slice(0, 5)
-      saveRecent(next)
-      return next
-    })
+    setPendingFor(id, true)
     try {
-      const res = await askChat(query, regionLabel)
-      setMessages((m) => [...m, { role: 'bot', text: res.answer, sources: res.sources }])
+      const res = await askChat(query, regionLabel, history)
+      append(id, { role: 'bot', text: res.answer, sources: res.sources })
     } catch (e) {
-      setMessages((m) => [...m, { role: 'bot', text: `오류가 발생했어요: ${e.message}`, sources: [] }])
+      append(id, { role: 'bot', text: `오류가 발생했어요: ${e.message}`, sources: [], error: true })
     } finally {
-      setLoading(false)
+      setPendingFor(id, false)
     }
-  }, [loading, regionLabel])
+  }, [loading, active, create, append, setPendingFor, regionLabel])
+  const sendRef = useRef(send)
+  useEffect(() => { sendRef.current = send }, [send])
 
   // 기관 상세 화면의 "챗봇에 물어보기"로 들어온 질문을 바로 보낸다
   const handledQuery = useRef(null)
@@ -75,9 +84,10 @@ export default function ChatPage() {
     if (q && regionLabel && handledQuery.current !== q) {
       handledQuery.current = q
       setParams({}, { replace: true })
-      send(q)
+      startNew()
+      sendRef.current(q, { fresh: true })
     }
-  }, [params, regionLabel, send, setParams])
+  }, [params, regionLabel, setParams, startNew])
 
   const empty = messages.length === 0
   const lastSources = [...messages].reverse().find((m) => m.role === 'bot')?.sources ?? []
@@ -85,6 +95,10 @@ export default function ChatPage() {
   return (
     <div className={`chat-layout ${empty ? '' : 'has-thread'}`}>
       <section className={`chat ${empty ? 'is-empty' : ''}`}>
+        {/* 모바일: 사이드바가 없어서 대화 기록을 서랍으로 연다 */}
+        <div className="chat-topbar">
+          <button onClick={() => setDrawerOpen(true)}><History size={17} />대화 기록</button>
+        </div>
         {empty ? (
           <div className="welcome">
             <span className="eyebrow"><Sparkles size={14} /> 공공데이터 기반 RAG</span>
@@ -99,16 +113,6 @@ export default function ChatPage() {
                 </button>
               ))}
             </div>
-            {recent.length > 0 && (
-              <div className="recent">
-                <h2><History size={15} strokeWidth={1.8} />최근 질문</h2>
-                <ul>
-                  {recent.map((q) => (
-                    <li key={q}><button onClick={() => send(q)}>{q}<ArrowRight size={15} /></button></li>
-                  ))}
-                </ul>
-              </div>
-            )}
           </div>
         ) : (
           <div className="thread">
@@ -121,7 +125,12 @@ export default function ChatPage() {
                       <span>에이전트 답변 · 근거 {m.sources?.length ?? 0}건</span>
                     </div>
                   )}
-                  <p>{m.text}</p>
+                  {m.role === 'bot' ? (
+                    // 답변은 마크다운(굵게·목록·제목). 원문 HTML은 렌더링하지 않는다(react-markdown 기본값)
+                    <div className="markdown"><Markdown remarkPlugins={[remarkGfm]}>{stripSourceList(m.text)}</Markdown></div>
+                  ) : (
+                    <p>{m.text}</p>
+                  )}
                   {m.sources?.length > 0 && (
                     <div className="sources">
                       {m.sources.map((s, j) => (
@@ -179,6 +188,16 @@ export default function ChatPage() {
           </ol>
           <footer>BGE-M3 + BM25 하이브리드 검색</footer>
         </aside>
+      )}
+
+      {drawerOpen && (
+        <div className="history-drawer" role="dialog" aria-modal="true" aria-label="대화 기록">
+          <button className="history-drawer-backdrop" aria-label="닫기" onClick={() => setDrawerOpen(false)} />
+          <div className="history-drawer-panel glass">
+            <button className="history-drawer-close" aria-label="닫기" onClick={() => setDrawerOpen(false)}><X size={18} /></button>
+            <ConversationList onNavigate={() => setDrawerOpen(false)} />
+          </div>
+        </div>
       )}
     </div>
   )

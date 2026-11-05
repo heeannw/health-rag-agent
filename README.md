@@ -41,11 +41,30 @@ API 키·DB 접속 정보는 **저장소 루트의 `.env` 하나**로 관리합�
 copy .env.example .env    # 루트에서 실행 후 값 채우기 (.env는 커밋되지 않음)
 ```
 
+## 실행 방법 (웹 서비스)
+
+백엔드와 프론트엔드를 터미널 두 개에서 각각 켭니다. 처음 설치, 필요한 키, 자주 나오는 문제는 [`agent/README.md`](./agent/README.md#실행-방법)를 참고하세요.
+
+```bash
+# 터미널 1 — 백엔드 (http://localhost:8000)
+cd agent/backend
+.venv\Scripts\activate
+uvicorn app.main:app --reload --port 8000
+```
+
+```bash
+# 터미널 2 — 프론트엔드 (http://localhost:5173)
+cd agent/frontend
+npm run dev
+```
+
+챗봇 인덱스 빌드 등 RAG 파이프라인 단독 실행은 [`data-rag/README.md`](./data-rag/README.md), 혜택 데이터 수집은 [`health_benefits/`](./health_benefits)를 참고하세요.
+
 ## 데이터 출처
 
 | 데이터 | 링크 | 제공 형태 | 쓰는 곳 | 비고 |
 | --- | --- | --- | --- | --- |
-| 한국사회보장정보원 중앙부처복지서비스 | [15090532](https://www.data.go.kr/data/15090532/openapi.do) | Open API | 챗봇(RAG), 혜택 추천 (`healty_benefit`) | 원문에 신청방법·구비서류·근거법령이 있지만 현재 DB에는 대상·선정기준·지원내용만 저장 |
+| 한국사회보장정보원 중앙부처복지서비스 | [15090532](https://www.data.go.kr/data/15090532/openapi.do) | Open API | 챗봇(RAG), 혜택 추천 (`healty_benefit`) | 대상·선정기준·지원내용과 신청방법·신청서식·근거법령 저장 (구비서류는 미저장) |
 | 한국사회보장정보원 지자체복지서비스 | [15108347](https://www.data.go.kr/data/15108347/openapi.do) | Open API | 챗봇(RAG), 혜택 추천 (`healty_benefit`) | 위와 같음 |
 | 한국사회보장정보원 복지사업 월별 급여지급 현황 | [15009571](https://www.data.go.kr/data/15009571/fileData.do) | 파일데이터(odcloud API) | 챗봇(RAG) | 지급 통계 |
 | 건강보험심사평가원 병원평가정보서비스 | [15094093](https://www.data.go.kr/data/15094093/openapi.do) | Open API | 챗봇(RAG), 지도·기관 상세 | 주소만 제공 → 카카오 주소 검색으로 좌표 변환. `asmGrdNN` 항목명은 활용가이드(2025-02-19) 기준 |

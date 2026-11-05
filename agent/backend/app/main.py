@@ -4,6 +4,8 @@
     uvicorn app.main:app --reload --port 8000
 """
 
+import threading
+from contextlib import asynccontextmanager
 from math import asin, cos, radians, sin, sqrt
 
 from fastapi import FastAPI, HTTPException, Query, Request
@@ -16,7 +18,14 @@ from app.services import benefits as benefit_search
 from app.services import rag
 from app.services.facilities import FACILITIES, REGIONS
 
-app = FastAPI(title="건강 정보·의료 혜택 AI 에이전트 API")
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    # 모델 로딩(수십 초)이 서버 시작을 막지 않도록 백그라운드에서 미리 불러온다
+    threading.Thread(target=rag.warm_up, daemon=True).start()
+    yield
+
+
+app = FastAPI(title="건강 정보·의료 혜택 AI 에이전트 API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -52,7 +61,8 @@ def health():
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat(req: ChatRequest):
     # 임베딩·LLM 호출이 동기 코드라 스레드풀에서 실행
-    return await run_in_threadpool(rag.ask, req.query, req.n_results, req.region)
+    history = [t.model_dump() for t in req.history]
+    return await run_in_threadpool(rag.ask, req.query, req.n_results, req.region, history)
 
 
 # 지역은 data/regions.json, 혜택은 health_benefits 검색, 기관은 data/facilities.json.
@@ -87,6 +97,7 @@ def facilities(
     lat: float | None = Query(None, description="거리 기준점 위도"),
     lng: float | None = Query(None, description="거리 기준점 경도"),
     radius_km: float | None = Query(None, gt=0, description="기준점에서 이 거리 안의 기관만 (lat·lng 필요)"),
+    limit: int | None = Query(None, ge=1, le=2000, description="가까운 순으로 이 개수까지만"),
 ):
     result = FACILITIES
     if type_list := _split(types):
@@ -105,7 +116,7 @@ def facilities(
         if radius_km is not None:
             result = [f for f in result if f.get("distance_km") is not None and f["distance_km"] <= radius_km]
         result.sort(key=lambda f: f.get("distance_km") if f.get("distance_km") is not None else float("inf"))
-    return result
+    return result[:limit] if limit else result
 
 
 @app.get("/api/facilities/{facility_id}", response_model=Facility)

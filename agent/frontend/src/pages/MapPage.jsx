@@ -22,6 +22,8 @@ function mergeFacilities(api, places) {
 
 // 시군구(현재 위치 포함)는 기준점 반경 안만, 시도 전체는 그 시도 기관만 보여준다
 const NEARBY_KM = 10
+// 서울 전체만 해도 기관이 1만 곳이 넘어서, 지도·목록에는 가까운 순으로 이만큼만 올린다
+const MAX_FACILITIES = 300
 const scopeParams = (region) => (region.municipality ? { radius_km: NEARBY_KM } : { province: region.province })
 
 export default function MapPage() {
@@ -50,7 +52,7 @@ export default function MapPage() {
       const placeTypes = types.length ? types : Object.keys(FACILITY_META)
       try {
         const [api, ...placeLists] = await Promise.all([
-          getFacilities({ types, q, ...center, ...scopeParams(region) }),
+          getFacilities({ types, q, ...center, ...scopeParams(region), limit: MAX_FACILITIES }),
           // 카카오 키가 없거나 검색이 막혀도 공공데이터 목록은 보여준다
           ...placeTypes.map((t) => searchNearbyPlaces(t, center).catch(() => [])),
         ])
@@ -103,7 +105,7 @@ export default function MapPage() {
               </button>
             ))}
           </div>
-          <p className="result-count">{ready ? `결과 ${items.length}곳 · 가까운 순` : '현재 위치를 찾는 중…'}</p>
+          <p className="result-count">{ready ? `가까운 순 ${items.length}곳` : '현재 위치를 찾는 중…'}</p>
           {error && <p className="error">{error}</p>}
           <ul>
             {items.map((f) => {

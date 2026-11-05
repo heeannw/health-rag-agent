@@ -92,6 +92,17 @@ def _region(address: str | None) -> tuple[str | None, str | None]:
     return parts[0], municipality
 
 
+def dedupe(facilities: list[dict]) -> list[dict]:
+    """같은 id는 하나만 남긴다. 장기요양기관 원문은 같은 기관이 여러 번 오고, 치매센터는
+    시도 개편 전후 주소로 두 번 오는 곳이 있어서 기준일이 가장 최근인 것을 남긴다."""
+    latest: dict[str, dict] = {}
+    for f in facilities:
+        prev = latest.get(f["id"])
+        if not prev or (f.get("details") or {}).get("기준일", "") > (prev.get("details") or {}).get("기준일", ""):
+            latest[f["id"]] = f
+    return list(latest.values())
+
+
 def _float(value) -> float | None:
     try:
         return float(value)
@@ -320,6 +331,7 @@ def main():
             facilities.extend(found)
     finally:
         geocode.save()
+    facilities = dedupe(facilities)
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     out = OUT_DIR / "facilities.json"

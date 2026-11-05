@@ -1,12 +1,23 @@
 """화면 ↔ API 응답 스키마. 원희(챗봇)·가은(매칭) 담당과 협의할 계약서 역할."""
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
+
+
+class ChatTurn(BaseModel):
+    """같은 대화의 이전 메시지 한 건."""
+
+    role: Literal["user", "assistant"]
+    content: str = Field(..., max_length=8000)
 
 
 class ChatRequest(BaseModel):
     query: str = Field(..., min_length=1, examples=["65세 이상 받을 수 있는 의료 혜택"])
     n_results: int = Field(5, ge=1, le=20)
     region: str | None = Field(None, examples=["서울특별시 마포구"])  # 사용자가 고른 지역 (선택)
+    # 이전 대화 (오래된 것부터). 후속 질문("신청은 어떻게 해?")의 맥락을 잡는 데 쓴다
+    history: list[ChatTurn] = Field(default_factory=list, max_length=40)
 
 
 class Source(BaseModel):
@@ -35,6 +46,11 @@ class BenefitDisplay(BaseModel):
     region: str
 
 
+class ApplicationForm(BaseModel):
+    name: str
+    link: str | None = None
+
+
 class Benefit(BaseModel):
     """가은 health_benefits의 healty_benefit 테이블 컬럼 + search_benefits 판정 결과."""
 
@@ -54,10 +70,10 @@ class Benefit(BaseModel):
     application_status: str = "unknown"  # unknown | scheduled | open | closed
     application_start_date: str | None = None
     application_deadline: str | None = None
-    apply_method: str | None = None  # 신청 방법·장소 (아직 DB 컬럼 없음)
-    documents: str | None = None     # 구비서류 (아직 DB 컬럼 없음)
-    legal_basis: str | None = None   # 근거법령 (아직 DB 컬럼 없음)
-    related_facility_type: str | None = None  # 이 혜택을 받으러 가는 기관 유형 (지도 연결용)
+    application_method: str | None = None  # 신청 방법·장소 (예: 주소지 관할 보건소 방문 신청)
+    application_forms: list[ApplicationForm] | None = None  # 신청 서식·안내 첨부파일 (복지로)
+    legal_basis: list[str] | None = None   # 근거법령·조례 이름
+    related_facility_type: str | None = None  # 이 혜택을 받으러 가는 기관 유형 (지도 연결용, 아직 DB 컬럼 없음)
     display: BenefitDisplay
     region_scope: str  # nationwide | regional | unknown
     review_fields: list[str] = []  # 선택한 조건 중 원문 정보가 없어 확인이 필요한 항목
