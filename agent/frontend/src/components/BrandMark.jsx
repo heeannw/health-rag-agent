@@ -1,21 +1,13 @@
-import { MeshGradient } from '@paper-design/shaders-react'
-import { HeartPulse } from 'lucide-react'
-import { useShouldAnimate } from '../hooks/motion.js'
+/** 서비스 '보듬' 로고 (하트 + 십자가 + 글자) */
+export default function BrandLogo({ height = 40 }) {
+  return <img className="brand-logo" src="/brand/bodeum-logo.png" alt="보듬" height={height} width={Math.round(height * 2.425)} />
+}
 
-/** 사이드바 로고: 팔레트 3색이 천천히 섞이는 메시 그러데이션 (paper-design shaders) 위에 아이콘. */
-export default function BrandMark({ size = 40 }) {
-  const animate = useShouldAnimate()
+/** 챗봇 답변 옆 프로필: 로고의 하트·십자가 부분만 */
+export function BodeumAvatar() {
   return (
-    <span className="brand-mark" style={{ width: size, height: size }} aria-hidden="true">
-      <MeshGradient
-        width={size}
-        height={size}
-        colors={['#D7F6F7', '#71BAF6', '#FFC9CA', '#71BAF6']}
-        distortion={0.8}
-        swirl={0.4}
-        speed={animate ? 0.4 : 0}
-      />
-      <HeartPulse className="brand-icon" size={size * 0.5} strokeWidth={2.2} />
+    <span className="avatar" aria-hidden="true">
+      <img src="/brand/bodeum-mark.png" alt="" width="26" height="26" />
     </span>
   )
 }

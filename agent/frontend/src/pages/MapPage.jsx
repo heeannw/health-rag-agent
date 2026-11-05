@@ -9,6 +9,10 @@ import { useRegion } from '../region.jsx'
 
 const squash = (name) => name.replace(/\s/g, '')
 
+/** 병원 평가등급이 많게는 10개 넘게 와서, 목록에는 가장 좋은 등급 하나와 나머지 개수만 보여준다 */
+const gradeNo = (g) => Number(g.match(/(\d+)\s*등급/)?.[1] ?? 99)
+const bestGrade = (grades) => [...grades].sort((a, b) => gradeNo(a) - gradeNo(b))[0]
+
 /**
  * 공공데이터 기관(/api/facilities)과 카카오 장소 검색 결과를 합친다.
  * 같은 기관(이름 같고 300m 이내)은 상세정보가 있는 공공데이터를 남긴다.
@@ -21,9 +25,9 @@ function mergeFacilities(api, places) {
 }
 
 // 시군구(현재 위치 포함)는 기준점 반경 안만, 시도 전체는 그 시도 기관만 보여준다
-const NEARBY_KM = 10
+const NEARBY_KM = 5
 // 서울 전체만 해도 기관이 1만 곳이 넘어서, 지도·목록에는 가까운 순으로 이만큼만 올린다
-const MAX_FACILITIES = 300
+const MAX_FACILITIES = 200
 const scopeParams = (region) => (region.municipality ? { radius_km: NEARBY_KM } : { province: region.province })
 
 export default function MapPage() {
@@ -121,7 +125,10 @@ export default function MapPage() {
                         {meta?.label}{f.summary ? ` · ${f.summary}` : ''}
                       </small>
                       {f.grades.length > 0 && (
-                        <span className="grades">{f.grades.map((g) => <span key={g} className="tag blue">{g}</span>)}</span>
+                        <span className="grades" title={f.grades.join(', ')}>
+                          <span className="tag blue">{bestGrade(f.grades)}</span>
+                          {f.grades.length > 1 && <span className="tag more">평가 +{f.grades.length - 1}</span>}
+                        </span>
                       )}
                     </span>
                     {f.distance_km != null && <span className="distance">{f.distance_km}km</span>}

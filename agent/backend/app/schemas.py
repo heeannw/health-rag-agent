@@ -73,7 +73,8 @@ class Benefit(BaseModel):
     application_method: str | None = None  # 신청 방법·장소 (예: 주소지 관할 보건소 방문 신청)
     application_forms: list[ApplicationForm] | None = None  # 신청 서식·안내 첨부파일 (복지로)
     legal_basis: list[str] | None = None   # 근거법령·조례 이름
-    related_facility_type: str | None = None  # 이 혜택을 받으러 가는 기관 유형 (지도 연결용, 아직 DB 컬럼 없음)
+    related_facility_type: str | None = None  # 이 혜택을 받으러 가는 대표 기관 유형 (지도 연결용, 아직 DB 컬럼 없음)
+    related_facility_types: list[str] = []  # 키워드로 추정한 관련 기관 유형 전체 (기관 상세의 연계 혜택용)
     display: BenefitDisplay
     region_scope: str  # nationwide | regional | unknown
     review_fields: list[str] = []  # 선택한 조건 중 원문 정보가 없어 확인이 필요한 항목

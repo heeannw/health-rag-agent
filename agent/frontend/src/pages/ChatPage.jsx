@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
-  ArrowUp, Baby, Brain, FileText, Gift, HeartPulse, History, MapPinned, Sparkles, Stethoscope, X,
+  ArrowUp, Baby, Brain, FileText, Gift, HeartHandshake, HeartPulse, History, MapPinned, Stethoscope, X,
 } from 'lucide-react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -9,6 +9,7 @@ import { SOURCE_LABELS, askChat } from '../api.js'
 import { useRegion } from '../region.jsx'
 import { useChatHistory } from '../chatHistory.jsx'
 import ConversationList from '../components/ConversationList.jsx'
+import { BodeumAvatar } from '../components/BrandMark.jsx'
 
 const NO_MESSAGES = []
 
@@ -47,8 +48,13 @@ export default function ChatPage() {
     endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
   }, [messages, loading])
 
-  // 챗봇 화면에 들어오면 이전 대화 대신 항상 새 대화로 시작
-  useEffect(() => { startNew() }, [startNew])
+  // 챗봇 화면에 들어오면 이전 대화 대신 항상 새 대화로 시작.
+  // 단 ?q=로 질문을 들고 왔으면 아래 효과가 만든 대화를 닫으면 안 된다
+  // (StrictMode에서 이 효과가 한 번 더 돌면 방금 보낸 대화가 닫혀 빈 화면이 됐었다)
+  const arrivedWithQuery = useRef(params.has('q'))
+  useEffect(() => {
+    if (!arrivedWithQuery.current) startNew()
+  }, [startNew])
 
   // 다른 대화를 열면 맨 아래(최근 메시지)로
   useEffect(() => {
@@ -101,9 +107,8 @@ export default function ChatPage() {
         </div>
         {empty ? (
           <div className="welcome">
-            <span className="eyebrow"><Sparkles size={14} /> 공공데이터 기반 RAG</span>
-            <h1>무엇이든 물어보세요.<br />근거와 출처까지 찾아드릴게요.</h1>
-            <p>{shortLabel ? `${regionLabel} 기준으로 ` : ''}복지 혜택, 신청 방법, 관련 법령, 의료기관 정보를 안내해요.</p>
+            <h1>필요한 도움, 곁에서 같이 찾아볼게요.</h1>
+            <p>{shortLabel ? `${regionLabel} 기준으로 ` : ''}복지 혜택, 신청 방법, 관련 법령, 의료기관 정보를 차근차근 안내해요.</p>
             <div className="prompt-grid">
               {EXAMPLES.map(({ icon: Icon, tone, title, query }) => (
                 <button key={title} className="prompt-card glass" onClick={() => send(query)}>
@@ -118,11 +123,11 @@ export default function ChatPage() {
           <div className="thread">
             {messages.map((m, i) => (
               <div key={i} className={`msg ${m.role}`}>
-                {m.role === 'bot' && <span className="avatar"><Sparkles size={16} /></span>}
+                {m.role === 'bot' && <BodeumAvatar />}
                 <div className={`bubble ${m.role === 'bot' ? 'glass' : ''}`}>
                   {m.role === 'bot' && (
                     <div className="answer-meta">
-                      <span>에이전트 답변 · 근거 {m.sources?.length ?? 0}건</span>
+                      <span>근거 {m.sources?.length ?? 0}건</span>
                     </div>
                   )}
                   {m.role === 'bot' ? (
@@ -149,7 +154,7 @@ export default function ChatPage() {
             ))}
             {loading && (
               <div className="msg bot">
-                <span className="avatar"><Sparkles size={16} /></span>
+                <BodeumAvatar />
                 <div className="bubble glass typing"><i /><i /><i /></div>
               </div>
             )}
@@ -161,7 +166,7 @@ export default function ChatPage() {
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="건강 혜택, 법 제도, 기관을 물어보세요"
+            placeholder="보듬이에게 혜택, 제도, 기관을 물어보세요"
             aria-label="질문 입력"
           />
           <button className="send" disabled={loading || !input.trim()} aria-label="보내기">

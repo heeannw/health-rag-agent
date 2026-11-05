@@ -25,7 +25,7 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title="건강 정보·의료 혜택 AI 에이전트 API", lifespan=lifespan)
+app = FastAPI(title="보듬 · 의료·복지 안내 AI 에이전트 API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

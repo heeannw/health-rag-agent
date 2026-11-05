@@ -7,6 +7,9 @@ import KakaoMap from '../components/KakaoMap.jsx'
 import { getBenefits, getFacility } from '../api.js'
 import { FACILITY_META } from '../facilityTypes.js'
 import { useRegion } from '../region.jsx'
+import { benefitPath } from '../benefitMeta.jsx'
+
+const MAX_LINKED = 8
 
 export default function FacilityDetailPage() {
   const { id } = useParams()
@@ -20,12 +23,14 @@ export default function FacilityDetailPage() {
     getFacility(id, region ? { lat: region.lat, lng: region.lng } : {})
       .then((f) => {
         setFacility(f)
-        // 기관 지역에서 받을 수 있는 혜택 중 이 기관 유형과 연결된 것 우선
+        // 기관 지역에서 받을 수 있는 혜택 중 이 기관 유형과 관련된 것만 (관계없는 혜택으로 채우지 않는다)
+        // related_facility_types는 백엔드가 혜택 이름·요약·신청방법 키워드로 추정한 값
         // (기관-혜택 직접 매핑은 가은 데이터 확정 후 교체)
-        return getBenefits({ province: f.province, municipality: f.municipality }).then(({ matched: list }) => {
-          const linked = list.filter((b) => b.related_facility_type === f.type)
-          return linked.length ? linked : list
-        })
+        return getBenefits({ province: f.province, municipality: f.municipality }).then(({ matched, needs_review }) =>
+          [...matched, ...needs_review]
+            .filter((b) => b.related_facility_types?.includes(f.type) || b.related_facility_type === f.type)
+            .slice(0, MAX_LINKED),
+        )
       })
       .then(setBenefits)
       .catch((e) => setError(e.message))
@@ -123,10 +128,17 @@ export default function FacilityDetailPage() {
         <div>
           <h2 className="section-title"><Gift size={20} strokeWidth={1.8} />이 기관과 연계된 혜택</h2>
           <ul className="linked-list">
+            {benefits.length === 0 && (
+              <li><p className="empty small">이 기관 유형과 연결된 혜택을 찾지 못했어요.</p></li>
+            )}
             {benefits.map((b) => (
               <li key={b.id}>
-                <Link className="linked glass" to="/benefits">
-                  <span><strong>{b.name}</strong><small>{b.criteria_text}</small></span>
+                <Link
+                  className="linked glass"
+                  to={benefitPath(b, { province: facility.province, municipality: facility.municipality })}
+                  state={{ benefit: b }}
+                >
+                  <span><strong>{b.name}</strong><small className="clamp-2">{b.summary_text || b.criteria_text}</small></span>
                   <ArrowRight size={18} />
                 </Link>
               </li>

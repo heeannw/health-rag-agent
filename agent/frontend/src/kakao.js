@@ -7,7 +7,7 @@ export function loadKakaoSdk() {
   if (!sdkPromise) {
     sdkPromise = new Promise((resolve, reject) => {
       const script = document.createElement('script')
-      script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${KAKAO_KEY}&libraries=services&autoload=false`
+      script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${KAKAO_KEY}&libraries=services,clusterer&autoload=false`
       script.onload = () => window.kakao.maps.load(() => resolve(window.kakao))
       script.onerror = () => {
         sdkPromise = null

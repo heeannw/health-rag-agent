@@ -3,6 +3,7 @@ import { BrowserRouter, NavLink, Route, Routes } from 'react-router-dom'
 import { Gift, MapPinned, MessageCircleHeart, ShieldCheck } from 'lucide-react'
 import ChatPage from './pages/ChatPage.jsx'
 import BenefitsPage from './pages/BenefitsPage.jsx'
+import BenefitDetailPage from './pages/BenefitDetailPage.jsx'
 import MapPage from './pages/MapPage.jsx'
 import FacilityDetailPage from './pages/FacilityDetailPage.jsx'
 import BrandMark from './components/BrandMark.jsx'
@@ -46,10 +47,7 @@ export default function App() {
           <aside className="sidebar glass">
             <div className="brand">
               <BrandMark />
-              <div>
-                <strong>의료·복지 안내</strong>
-                <span>AI 에이전트</span>
-              </div>
+              <span>곁에서 챙기는 의료·복지 안내</span>
             </div>
             <div className="side-region">
               <span>내 지역</span>
@@ -69,6 +67,7 @@ export default function App() {
             <Routes>
               <Route path="/" element={<ChatPage />} />
               <Route path="/benefits" element={<BenefitsPage />} />
+              <Route path="/benefits/:id" element={<BenefitDetailPage />} />
               <Route path="/map" element={<MapPage />} />
               <Route path="/facilities/:id" element={<FacilityDetailPage />} />
             </Routes>

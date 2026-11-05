@@ -5,6 +5,13 @@ import { KAKAO_KEY as KEY, loadKakaoSdk } from '../kakao.js'
  * markers: [{ id, name, lat, lng }] — 마커 클릭 시 onSelect(marker) 호출
  * center·level이 바뀌면 그 위치로 지도를 옮긴다. 멀리 있는 마커까지 다 보이게 줌아웃하지 않는다.
  */
+// 클러스터 묶음 모양 (카카오 클러스터러는 인라인 스타일만 받는다). 개수가 많을수록 크게
+const clusterStyle = (size) => ({
+  width: `${size}px`, height: `${size}px`, lineHeight: `${size - 6}px`, textAlign: 'center',
+  borderRadius: '50%', background: 'rgba(37, 120, 214, 0.88)', border: '3px solid rgba(255, 255, 255, 0.9)',
+  color: '#fff', fontSize: '14px', fontWeight: '800', boxShadow: '0 4px 14px rgba(16, 60, 110, 0.3)',
+})
+
 export default function KakaoMap({ markers, onSelect, center = { lat: 37.5665, lng: 126.978 }, level = 6 }) {
   const ref = useRef(null)
   const mapRef = useRef(null)
@@ -33,23 +40,42 @@ export default function KakaoMap({ markers, onSelect, center = { lat: 37.5665, l
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [center.lat, center.lng, level])
 
+  // 마커가 수백 개라 그대로 찍으면 지도가 핀으로 덮인다. 줌아웃 상태에선 숫자 묶음(클러스터)으로 보여주고,
+  // 묶음을 누르거나 가까이 확대하면(레벨 4 이하) 개별 마커로 풀린다
+  const clustererRef = useRef(null)
   useEffect(() => {
     if (!KEY) return
     let overlays = []
     let cancelled = false
     withMap((kakao, map) => {
       if (cancelled) return
+      if (!clustererRef.current && kakao.maps.MarkerClusterer) {
+        clustererRef.current = new kakao.maps.MarkerClusterer({
+          map,
+          averageCenter: true,
+          minLevel: 5,
+          gridSize: 70,
+          minClusterSize: 3,
+          disableClickZoom: false,
+          calculator: [10, 30, 100],
+          styles: [40, 46, 54, 62].map(clusterStyle),
+          clickable: true,
+        })
+      }
       overlays = markers
         .filter((m) => m.lat && m.lng)
         .map((m) => {
-          const marker = new kakao.maps.Marker({ map, position: new kakao.maps.LatLng(m.lat, m.lng), title: m.name })
+          const marker = new kakao.maps.Marker({ position: new kakao.maps.LatLng(m.lat, m.lng), title: m.name })
           kakao.maps.event.addListener(marker, 'click', () => onSelect?.(m))
           return marker
         })
+      if (clustererRef.current) clustererRef.current.addMarkers(overlays)
+      else overlays.forEach((o) => o.setMap(map))
     })
     return () => {
       cancelled = true
-      overlays.forEach((o) => o.setMap(null))
+      if (clustererRef.current) clustererRef.current.removeMarkers(overlays)
+      else overlays.forEach((o) => o.setMap(null))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [markers, onSelect])
