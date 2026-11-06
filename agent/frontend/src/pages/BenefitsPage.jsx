@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
-  ArrowRight, Baby, Brain, ChevronLeft, ChevronRight, HeartPulse, Info, Landmark, MapPin, Search, X,
+  Baby, Brain, ChevronLeft, ChevronRight, HeartPulse, Info, Search, X,
 } from 'lucide-react'
 import { getBenefits } from '../api.js'
 import { FACILITY_META } from '../facilityTypes.js'
-import { useRegion } from '../region.jsx'
+import { useRegion } from '../regionContext.js'
 import {
-  LIFE_CYCLES, REVIEW_LABELS, STATUS, audienceOf, benefitPath, iconFor, periodOf,
-} from '../benefitMeta.jsx'
+  LIFE_CYCLES, REVIEW_LABELS, STATUS, audienceOf, benefitPath, hasRegion, iconFor, periodOf,
+} from '../benefitMeta.js'
 
 // 가은 데이터의 theme_codes (의료 관련 3개 주제)
 const THEMES = [
@@ -178,8 +178,8 @@ export default function BenefitsPage() {
         </div>
       )}
 
-      <ul className="benefit-grid">
-        {pageItems.map((b, i) => <BenefitCard key={b.id} b={b} no={(page - 1) * pageSize + i + 1} region={region} />)}
+      <ul className="benefit-list">
+        {pageItems.map((b) => <BenefitRow key={b.id} b={b} region={region} />)}
       </ul>
       {data && results.length === 0 && !error && (
         <p className="empty">
@@ -233,43 +233,42 @@ function Pagination({ page, pageCount, onChange }) {
   )
 }
 
-// 카드에는 요약만 보여주고, 선정기준·신청방법 같은 긴 원문은 상세 페이지에서 보여준다
-function BenefitCard({ b, no, region }) {
+// 한 줄에 하나씩: 이름·구분·요약 한 줄 | 대상·지역·기간 | (가까운 기관 바로가기).
+// 선정기준·신청방법 같은 긴 원문은 상세 페이지에서 보여준다
+function BenefitRow({ b, region }) {
   const Icon = iconFor(b)
   const status = STATUS[b.application_status] ?? STATUS.unknown
   const facility = FACILITY_META[b.related_facility_type]
+  const FacilityIcon = facility?.icon
   const period = periodOf(b)
   return (
-    <li className="benefit-card glass">
-      <Link className="benefit-link" to={benefitPath(b, region)} state={{ benefit: b }}>
-        <div className="benefit-top">
-          <span className="icon-tile blue"><Icon size={20} strokeWidth={1.8} /></span>
-          <span className="benefit-no">{String(no).padStart(2, '0')}</span>
+    <li className="benefit-row glass">
+      <Link className="benefit-row-link" to={benefitPath(b, region)} state={{ benefit: b }}>
+        <span className="icon-tile blue"><Icon size={20} strokeWidth={1.8} /></span>
+        <div className="br-main">
+          <div className="br-title">
+            <h3>{b.name}</h3>
+            <span className={`tag ${b.source === 'central' ? 'blue' : 'pink'}`}>{b.source === 'central' ? '중앙부처' : '지자체'}</span>
+            <span className={`tag ${status.tone}`}>{status.label}</span>
+            {b.review_fields.map((f) => <span key={f} className="tag gray">{REVIEW_LABELS[f] ?? f} 확인</span>)}
+          </div>
+          {b.summary_text && <p className="clamp-1" title={b.summary_text}>{b.summary_text}</p>}
         </div>
-        <div className="benefit-tags">
-          <span className={`tag ${b.source === 'central' ? 'blue' : 'pink'}`}>{b.source === 'central' ? '중앙부처' : '지자체'}</span>
-          <span className={`tag ${status.tone}`}>{status.label}</span>
-          {b.review_fields.map((f) => <span key={f} className="tag gray">{REVIEW_LABELS[f] ?? f} 확인</span>)}
-        </div>
-        <h3>{b.name}</h3>
-        <p className="clamp">{b.summary_text}</p>
-        <dl className="benefit-facts">
-          <dt>대상</dt><dd>{audienceOf(b)}</dd>
-          {period && <><dt>신청기간</dt><dd>{period}</dd></>}
+        <dl className="br-meta">
+          <dt>대상</dt><dd title={audienceOf(b)}>{audienceOf(b)}</dd>
+          {/* 제공 지역 정보가 없는 혜택('대상 원문 확인')은 위치 표시를 뺀다 */}
+          {hasRegion(b) && <><dt>지역</dt><dd>{b.display.region}</dd></>}
+          {period && <><dt>기간</dt><dd>{period}</dd></>}
         </dl>
-        <div className="benefit-foot">
-          <span>
-            {b.region_scope === 'nationwide' ? <Landmark size={14} /> : <MapPin size={14} />}
-            {b.display.region}
-          </span>
-          <span className="benefit-more">자세히 보기 <ChevronRight size={14} /></span>
-        </div>
+        <ChevronRight size={18} className="br-chev" />
       </Link>
-      {facility && (
-        <Link className="benefit-cta" to={`/map?types=${b.related_facility_type}`}>
-          가까운 {facility.label} 보기 <ArrowRight size={16} />
+      {/* 바로가기가 없는 줄도 같은 자리를 비워 둬서 대상·지역 칸이 줄마다 어긋나지 않게 */}
+      {facility ? (
+        <Link className="br-cta" to={`/map?types=${b.related_facility_type}`} title={`가까운 ${facility.label} 보기`}>
+          {FacilityIcon && <FacilityIcon size={18} strokeWidth={1.8} />}
+          가까운 {facility.label}
         </Link>
-      )}
+      ) : <span className="br-cta empty" aria-hidden="true" />}
     </li>
   )
 }

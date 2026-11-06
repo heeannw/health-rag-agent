@@ -8,7 +8,8 @@ import MapPage from './pages/MapPage.jsx'
 import FacilityDetailPage from './pages/FacilityDetailPage.jsx'
 import BrandMark from './components/BrandMark.jsx'
 import { RegionProvider, RegionSelect } from './region.jsx'
-import { ChatHistoryProvider, useChatHistory } from './chatHistory.jsx'
+import { ChatHistoryProvider } from './chatHistory.jsx'
+import { useChatHistory } from './chatHistoryContext.js'
 import ConversationList from './components/ConversationList.jsx'
 
 // three.js가 커서 첫 화면 이후에 따로 불러온다
