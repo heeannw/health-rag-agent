@@ -108,3 +108,29 @@ python -m pipeline.generate "65세 이상 받을 수 있는 의료 혜택"
 - **(의도된 범위 제외)** 법제처 API는 신청한 것이 "목록조회"라 조문 원문은 못 가져오고 법령명·소관부처·시행일자 등 메타데이터만 확보됨. 조문 본문을 가져오려면 `open.law.go.kr`에 별도 가입·OC(이메일ID 기반) 인증키 신청이 필요한데, 핵심 기능(복지혜택/건강정보 안내)에 필수는 아니라고 판단해 이번 범위에서 제외하기로 함. 법령 관련 질의는 "관련 법령명 안내" 수준까지만 지원.
 - **(의도된 범위 제외)** 질병관리청 건강정보검색 API는 승인은 났으나 사용하지 않기로 함. REST(JSON/XML)가 아니라 브라우저에서 실제 폼 제출(페이지 네비게이션)로만 동작하는 HTML 위젯형 API라 `requests`/`curl` 등 스크립트 호출이 전부 차단됨(쿠키·Referer·User-Agent를 모두 맞춰도 실패, 브라우저 내부 `fetch()`조차 실패 — 실제 페이지 이동일 때만 동작). 정식 연동은 Playwright 같은 브라우저 자동화가 필요한데, 투입 대비 효과(어차피 "있으면 좋고 없어도 그만"인 일반 건강정보 콘텐츠)가 낮아 범위에서 제외. 신청 자체는 계정에 남아있지만 호출하지 않음.
 - 장기요양기관 검색 목록조회(`getLtcInsttSeachList02`)는 `siDoCd`(시도코드) 필수 파라미터를 넣지 않으면 빈 결과가 나옴 — `collectors/ltc_institution.py`의 `SIDO_CODES` 참고, 현재는 16개 시도 전체를 순회해 수집 중.
+
+### Shared medical-benefits DB index
+
+Run from `data-rag` with the backend stopped:
+
+```powershell
+.\.venv\Scripts\python.exe -m pipeline.build_benefits_index --dry-run
+.\.venv\Scripts\python.exe -m pipeline.build_benefits_index
+```
+
+The root `.env` must contain the shared PG connection settings. This reads
+`public.healty_benefit` in a read-only transaction, preserving the existing
+`welfare_central` / `welfare_local` source names and service IDs. It does not
+call the public welfare APIs or Gemini. It replaces the welfare subset with
+the DB snapshot; hospital, law and other source chunks are retained.
+
+Document snapshots and any existing Chroma backup are saved under
+`health_benefits/data/rag_builds/` (gitignored). Stale welfare chunks are
+removed only after the new chunk IDs have been verified. An interrupted
+build may contain partial updates: rerun successfully before serving it,
+or restore the saved Chroma backup while the backend is stopped.
+
+Restart the backend after a successful build so the in-memory BM25 index
+is regenerated. The BGE-M3 model downloads on first use and embedding can
+take time on a CPU. A new local DB initially contains only the welfare
+source; other sources require their own collection/build.
