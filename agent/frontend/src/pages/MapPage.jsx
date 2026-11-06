@@ -5,7 +5,8 @@ import KakaoMap from '../components/KakaoMap.jsx'
 import { getFacilities } from '../api.js'
 import { FACILITY_META } from '../facilityTypes.js'
 import { searchNearbyPlaces } from '../kakao.js'
-import { useRegion } from '../region.jsx'
+import { isKakaoPlace, savePlace } from '../placeCache.js'
+import { useRegion } from '../regionContext.js'
 
 const squash = (name) => name.replace(/\s/g, '')
 
@@ -76,11 +77,11 @@ export default function MapPage() {
   }, [region, ready, types, query])
 
   const toggleType = (key) => setTypes((t) => (t.includes(key) ? t.filter((k) => k !== key) : [...t, key]))
-  // 카카오 장소는 우리 상세 데이터가 없어서 카카오맵 장소 페이지로 연다
-  const open = useCallback(
-    (f) => (f.place_url ? window.open(f.place_url, '_blank', 'noopener') : navigate(`/facilities/${f.id}`)),
-    [navigate],
-  )
+  // 카카오 장소도 같은 기관 상세 화면으로 연다. 백엔드에 없는 장소라 데이터를 같이 넘겨 둔다
+  const open = useCallback((f) => {
+    if (isKakaoPlace(f.id)) savePlace(f)
+    navigate(`/facilities/${f.id}`, { state: isKakaoPlace(f.id) ? { facility: f } : undefined })
+  }, [navigate])
   const center = useMemo(() => (region ? { lat: region.lat, lng: region.lng } : undefined), [region])
 
   return (

@@ -6,8 +6,9 @@ import {
 } from 'lucide-react'
 import { getBenefits } from '../api.js'
 import { FACILITY_META } from '../facilityTypes.js'
-import { useRegion } from '../region.jsx'
-import { FormLink, REVIEW_LABELS, STATUS, audienceOf, iconFor, periodOf } from '../benefitMeta.jsx'
+import { useRegion } from '../regionContext.js'
+import FormLink from '../components/FormLink.jsx'
+import { REVIEW_LABELS, STATUS, audienceOf, hasRegion, iconFor, periodOf } from '../benefitMeta.js'
 
 // 신청방법 원문은 '신청기관: … 조사기관: … 결정기관: …'이 한 줄로 이어져 와서 단계별로 나눈다
 const STEP_RE = /([가-힣]+기관(?:목록)?)\s*:/g
@@ -60,8 +61,8 @@ export default function BenefitDetailPage() {
   const goBack = () => (location.key !== 'default' ? navigate(-1) : navigate('/benefits'))
   const back = <button type="button" className="back" onClick={goBack}><ArrowLeft size={18} />뒤로</button>
 
-  if (error) return <section className="page">{back}<p className="error">{error}</p></section>
-  if (!benefit) return <section className="page">{back}<p className="empty">불러오는 중…</p></section>
+  if (error) return <section className="page page-full">{back}<p className="error">{error}</p></section>
+  if (!benefit) return <section className="page page-full">{back}<p className="empty">불러오는 중…</p></section>
 
   const b = benefit
   const Icon = iconFor(b)
@@ -71,7 +72,7 @@ export default function BenefitDetailPage() {
   const steps = b.application_method ? splitSteps(b.application_method) : null
 
   return (
-    <section className="page benefit-detail">
+    <section className="page page-full benefit-detail">
       {back}
 
       <div className="detail-hero glass">
@@ -87,12 +88,14 @@ export default function BenefitDetailPage() {
         </div>
       </div>
 
-      <ul className="bd-facts glass">
+      <ul className={`bd-facts glass ${hasRegion(b) ? '' : 'two'}`}>
         <li><UserCheck size={18} /><span>대상</span><strong>{audienceOf(b)}</strong></li>
-        <li>
-          {b.region_scope === 'nationwide' ? <Landmark size={18} /> : <MapPin size={18} />}
-          <span>지역</span><strong>{b.display.region}</strong>
-        </li>
+        {hasRegion(b) && (
+          <li>
+            {b.region_scope === 'nationwide' ? <Landmark size={18} /> : <MapPin size={18} />}
+            <span>지역</span><strong>{b.display.region}</strong>
+          </li>
+        )}
         <li><CalendarDays size={18} /><span>신청기간</span><strong>{period ?? '상시 · 원문 확인'}</strong></li>
       </ul>
 

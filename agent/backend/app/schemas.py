@@ -29,6 +29,9 @@ class Source(BaseModel):
 class ChatResponse(BaseModel):
     answer: str
     sources: list[Source]
+    # 서비스 범위 밖 질문이라 검색 없이 안내 문구로 답한 경우 그 사유
+    # off_topic | diagnosis | abusive | injection | gibberish | too_long | crisis
+    blocked: str | None = None
 
 
 class Region(BaseModel):

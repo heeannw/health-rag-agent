@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Claude Code 로컬 설정 (실행 설정은 저장소 상위 .claude/launch.json)
+.claude/

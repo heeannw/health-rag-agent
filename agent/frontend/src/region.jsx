@@ -1,10 +1,10 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { LoaderCircle, LocateFixed, MapPin } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getRegions } from './api.js'
+import RegionPicker from './components/RegionPicker.jsx'
 import { regionFromCoords } from './kakao.js'
+import { RegionContext, useRegion } from './regionContext.js'
 
 const STORAGE_KEY = 'health-agent:region:v2'
-const RegionContext = createContext(null)
 
 /** 위치를 못 받거나 거부했을 때 쓰는 기본 지역. 좌표는 서울시청. */
 const SEOUL_ALL = { province: '서울특별시', municipality: null, lat: 37.5665, lng: 126.978 }
@@ -113,41 +113,17 @@ export function RegionProvider({ children }) {
   return <RegionContext.Provider value={value}>{children}</RegionContext.Provider>
 }
 
-export function useRegion() {
-  return useContext(RegionContext)
-}
-
-export function RegionSelect({ className = '' }) {
-  const { regions, label, setRegionKey, locate, locating, locateError } = useRegion()
-  // 시도별로 묶어서 '서울특별시 전체' 다음에 그 시도의 시군구가 오게 한다
-  const groups = useMemo(() => {
-    const byProvince = new Map()
-    regions.forEach((r) => byProvince.set(r.province, [...(byProvince.get(r.province) ?? []), r]))
-    return [...byProvince]
-  }, [regions])
+export function RegionSelect() {
+  const { regions, region, setRegionKey, locate, locating, locateError } = useRegion()
   return (
-    <>
-      <label className={`region-select ${className}`}>
-        <MapPin size={16} strokeWidth={1.8} />
-        <select value={label} onChange={(e) => setRegionKey(e.target.value)} aria-label="내 지역">
-          {groups.map(([province, list]) => (
-            <optgroup key={province} label={province}>
-              {list.map((r) => <option key={keyOf(r)} value={keyOf(r)}>{r.municipality ?? `${province} 전체`}</option>)}
-            </optgroup>
-          ))}
-        </select>
-        <button
-          type="button"
-          className="locate-btn"
-          onClick={locate}
-          disabled={locating}
-          title="현재 위치로 설정"
-          aria-label="현재 위치로 설정"
-        >
-          {locating ? <LoaderCircle size={16} className="spin" /> : <LocateFixed size={16} strokeWidth={1.8} />}
-        </button>
-      </label>
-      {locateError && <small className="region-hint">{locateError}</small>}
-    </>
+    <RegionPicker
+      regions={regions}
+      region={region}
+      keyOf={keyOf}
+      onChoose={(r) => setRegionKey(keyOf(r))}
+      locate={locate}
+      locating={locating}
+      locateError={locateError}
+    />
   )
 }

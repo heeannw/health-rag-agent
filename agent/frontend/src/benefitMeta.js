@@ -1,5 +1,5 @@
 import {
-  Baby, Briefcase, FileDown, GraduationCap, HeartPulse, School, Smile, Sparkle, Users,
+  Baby, Briefcase, GraduationCap, HeartPulse, School, Smile, Sparkle, Users,
 } from 'lucide-react'
 
 // 가은 데이터 life_cycle_names 원문 분류명 (복지로 생애주기)
@@ -29,6 +29,9 @@ export const iconFor = (b) => LIFE_CYCLES.find((c) => c.value && b.life_cycle_na
 // 둘 다 원문 미확인이면 '대상 원문 확인 · 대상 원문 확인'처럼 반복되지 않게 한 번만
 export const audienceOf = (b) => [...new Set([b.display.life_cycle, b.display.target_group])].join(' · ')
 
+// 제공 지역을 알 수 없는 혜택(search_benefits의 region_scope가 unknown)은 위치를 보여주지 않는다
+export const hasRegion = (b) => b.region_scope !== 'unknown' && Boolean(b.display?.region)
+
 export const periodOf = (b) =>
   b.application_start_date || b.application_deadline
     ? `${b.application_start_date ?? ''} ~ ${b.application_deadline ?? ''}`
@@ -41,12 +44,4 @@ export const benefitPath = (b, region) => {
   if (region?.municipality) params.set('municipality', region.municipality)
   const q = params.toString()
   return `/benefits/${encodeURIComponent(b.id)}${q ? `?${q}` : ''}`
-}
-
-// 신청 서식은 복지로 첨부파일 링크. http(s) 링크만 걸고 나머지는 이름만 보여준다
-export function FormLink({ form }) {
-  const safe = /^https?:\/\//.test(form.link ?? '')
-  return safe
-    ? <a href={form.link} target="_blank" rel="noreferrer"><FileDown size={13} />{form.name}</a>
-    : <span>{form.name}</span>
 }

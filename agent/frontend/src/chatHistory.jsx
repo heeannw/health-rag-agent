@@ -1,4 +1,5 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { ChatHistoryContext } from './chatHistoryContext.js'
 
 /**
  * 챗봇 대화 기록. 로그인이 없어서 이 브라우저(localStorage)에만 저장한다.
@@ -6,7 +7,6 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
  */
 const STORAGE_KEY = 'health-agent:conversations:v1'
 const MAX_CONVERSATIONS = 100
-const ChatHistoryContext = createContext(null)
 
 function load() {
   try {
@@ -97,31 +97,4 @@ export function ChatHistoryProvider({ children }) {
   }, [conversations, activeId, startNew, create, append, remove, pending, setPendingFor])
 
   return <ChatHistoryContext.Provider value={value}>{children}</ChatHistoryContext.Provider>
-}
-
-export function useChatHistory() {
-  const ctx = useContext(ChatHistoryContext)
-  if (!ctx) throw new Error('useChatHistory는 ChatHistoryProvider 안에서만 쓸 수 있어요')
-  return ctx
-}
-
-/** 사이드바 묶음 이름: 오늘 / 어제 / 지난 7일 / 지난 30일 / 그 이전 */
-export function groupByDate(conversations, now = new Date()) {
-  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
-  const day = 24 * 60 * 60 * 1000
-  const buckets = [
-    ['오늘', startOfToday],
-    ['어제', startOfToday - day],
-    ['지난 7일', startOfToday - 7 * day],
-    ['지난 30일', startOfToday - 30 * day],
-    ['그 이전', -Infinity],
-  ]
-  const groups = []
-  for (const c of conversations) {
-    const [label] = buckets.find(([, from]) => c.updatedAt >= from)
-    const last = groups[groups.length - 1]
-    if (last?.label === label) last.items.push(c)
-    else groups.push({ label, items: [c] })
-  }
-  return groups
 }

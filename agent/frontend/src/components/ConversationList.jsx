@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { CheckSquare, LoaderCircle, MessageSquare, Trash2, X } from 'lucide-react'
-import { groupByDate, useChatHistory } from '../chatHistory.jsx'
+import { groupByDate, useChatHistory } from '../chatHistoryContext.js'
 
 /**
  * 챗봇 대화 기록 목록. 데스크톱은 왼쪽 사이드바, 모바일은 챗봇 화면의 서랍에 들어간다.
