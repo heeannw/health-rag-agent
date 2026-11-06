@@ -242,6 +242,14 @@ a { color: inherit; }
 .answer-sources li > div { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .answer-sources strong { font-size: 13px; font-weight: 700; line-height: 1.45; }
 .answer-sources small { font-size: 12px; color: var(--muted); line-height: 1.45; overflow-wrap: anywhere; }
+.answer-sources small a { display: inline-flex; align-items: center; gap: 2px; color: var(--bodeum-green-ink); font-weight: 600; text-decoration: none; }
+.answer-sources small a:hover { text-decoration: underline; }
+.source-title-link {
+  padding: 0; border: none; background: none; text-align: left; cursor: pointer;
+  font-size: 13px; font-weight: 700; line-height: 1.45; color: inherit;
+  text-decoration: underline; text-decoration-color: var(--line-soft); text-underline-offset: 3px;
+}
+.source-title-link:hover { color: var(--bodeum-green-ink); text-decoration-color: currentColor; }
 .typing { display: flex; gap: 5px; padding: 18px 20px; }
 .typing i { width: 7px; height: 7px; border-radius: 50%; background: var(--bodeum-green); animation: blink 1.2s infinite ease-in-out; }
 .typing i:nth-child(2) { animation-delay: 0.15s; }
@@ -729,10 +737,18 @@ button.benefit-cta { border: none; cursor: pointer; font-family: inherit; gap: 8
 /* ── 넓은 화면: 혜택 목록·혜택 상세·기관 상세는 화면 폭을 채운다 ── */
 .page.page-wide, .page.page-full { max-width: 1480px; }
 
-/* 혜택 상세: 폭이 넓을 땐 선정기준(긴 글)을 왼쪽, 신청 방법·서식을 오른쪽에 */
+/* 혜택 상세 카드: 좁은 화면에선 한 줄로 (선정기준 → 신청 방법 → 서식 순서) */
+.bd-col { display: contents; }
+.bd-criteria { order: 1; }
+.bd-apply { order: 2; }
+.bd-forms { order: 3; }
+
+/* 넓은 화면: 선정기준은 왼쪽, 신청 방법은 오른쪽, 서식은 짧은 쪽 아래.
+   두 단의 바닥을 맞추려고 각 단의 마지막 카드가 남는 높이를 채운다 */
 @media (min-width: 1100px) {
-  .page-full .bd-sections { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); grid-template-rows: auto 1fr; align-items: start; }
-  .page-full .bd-sections > :first-child:not(:only-child) { grid-row: span 2; }
+  .page-full .bd-sections.two-col { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); align-items: stretch; }
+  .page-full .bd-sections.two-col .bd-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .page-full .bd-sections.two-col .bd-col > :last-child { flex: 1; }
 }
 
 /* ── 혜택 목록: 한 줄에 하나씩 훑어보는 목록 + 페이지 나눔 ─────────── */

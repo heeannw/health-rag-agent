@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
-  ArrowUp, Baby, Brain, FileText, Gift, HeartHandshake, HeartPulse, History, MapPinned, Stethoscope, X,
+  ArrowUp, Baby, Brain, ExternalLink, FileText, Gift, HeartHandshake, HeartPulse, History, MapPinned, Stethoscope, X,
 } from 'lucide-react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { SOURCE_LABELS, askChat } from '../api.js'
+import { SOURCE_LABELS, askChat, getBenefitByService } from '../api.js'
+import { benefitPath } from '../benefitMeta.js'
 import { useRegion } from '../regionContext.js'
 import { useChatHistory } from '../chatHistoryContext.js'
 import ConversationList from '../components/ConversationList.jsx'
@@ -20,8 +21,23 @@ const EXAMPLES = [
   { icon: Stethoscope, tone: 'blue', title: '법·제도', query: '고혈압 관련 법 제도 알려줘' },
 ]
 
-/** 인용 출처 한 건의 보조 설명 (근거법령 > 소관부처 > 출처 종류) */
-const sourceNote = (s) => s.metadata?.근거법령 || s.metadata?.소관부처 || s.metadata?.주소 || ''
+/**
+ * 인용 출처 한 건의 보조 설명 (근거법령 > 소관부처 > 주소 > 지역).
+ * 혜택 DB로 다시 만든 복지 인덱스엔 근거법령·소관부처가 없어 지역을 보여주고, 중앙부처 사업은 전국
+ */
+const sourceNote = (s) =>
+  s.metadata?.근거법령 || s.metadata?.소관부처 || s.metadata?.주소 || s.metadata?.지역 ||
+  (s.source === 'welfare_central' ? '전국' : '')
+
+/** 원문 링크 (http(s)만) */
+const sourceUrl = (s) => {
+  const url = s.metadata?.source_url || s.metadata?.url
+  return /^https?:\/\//.test(url ?? '') ? url : null
+}
+
+/** 혜택 상세 페이지로 열 수 있는 출처 (복지 인덱스의 서비스 코드가 있을 때) */
+const benefitServiceId = (s) =>
+  (s.source === 'welfare_central' || s.source === 'welfare_local') ? s.metadata?.source_service_id : null
 
 /** LLM 답변 끝의 '[출처]' 목록은 답변 아래 인용 출처 목록과 겹쳐서 뗀다 */
 const stripSourceList = (text) => text.replace(/\n+(-{3,}\s*\n+)?\[출처\][\s\S]*$/, '').trim()
@@ -49,6 +65,19 @@ export default function ChatPage() {
   const { label: regionLabel, shortLabel } = useRegion()
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
+
+  // 복지 출처를 누르면 서비스 코드로 혜택을 찾아 상세 화면으로. 새로고침해도 찾게 제공기관 지역을 넘긴다
+  const openBenefit = useCallback(async (s) => {
+    try {
+      const b = await getBenefitByService(s.source, benefitServiceId(s))
+      const region = b.provider_province ? { province: b.provider_province, municipality: b.provider_municipality } : null
+      navigate(benefitPath(b, region), { state: { benefit: b } })
+    } catch (e) {
+      // 혜택 DB에 없는 출처(예: 예전 인덱스)면 원문으로 대신 연다
+      if (sourceUrl(s)) window.open(sourceUrl(s), '_blank', 'noreferrer')
+      else window.alert(`혜택 정보를 열 수 없어요: ${e.message}`)
+    }
+  }, [navigate])
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
@@ -152,10 +181,15 @@ export default function ChatPage() {
                           <li key={j}>
                             <b>{j + 1}</b>
                             <div>
-                              <strong>{s.title}</strong>
+                              {benefitServiceId(s)
+                                ? <button type="button" className="source-title-link" onClick={() => openBenefit(s)}>{s.title}</button>
+                                : <strong>{s.title}</strong>}
                               <small>
                                 {SOURCE_LABELS[s.source] ?? s.source}
                                 {sourceNote(s) && <> · {sourceNote(s)}</>}
+                                {sourceUrl(s) && (
+                                  <> · <a href={sourceUrl(s)} target="_blank" rel="noreferrer">원문 보기<ExternalLink size={11} /></a></>
+                                )}
                               </small>
                             </div>
                           </li>

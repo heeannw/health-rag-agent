@@ -71,6 +71,45 @@ export default function BenefitDetailPage() {
   const period = periodOf(b)
   const steps = b.application_method ? splitSteps(b.application_method) : null
 
+  const criteriaCard = b.criteria_text && (
+    <article key="criteria" className="bd-section glass bd-criteria">
+      <h2 className="section-title"><ClipboardList size={20} strokeWidth={1.8} />누가 받을 수 있나요 · 공식 선정기준</h2>
+      <p className="bd-text">{formatCriteria(b.criteria_text)}</p>
+    </article>
+  )
+  const applyCard = b.application_method && (
+    <article key="apply" className="bd-section glass bd-apply">
+      <h2 className="section-title"><FileText size={20} strokeWidth={1.8} />어떻게 신청하나요</h2>
+      {steps ? (
+        <ol className="bd-steps">
+          {steps.map((s, i) => (
+            <li key={s.label + i}><span className="bd-step-no">{i + 1}</span><div><strong>{s.label}</strong><p>{s.body}</p></div></li>
+          ))}
+        </ol>
+      ) : (
+        <p className="bd-text">{b.application_method}</p>
+      )}
+    </article>
+  )
+  const formsCard = (b.application_forms?.length > 0 || b.legal_basis?.length > 0) && (
+    <article key="forms" className="bd-section glass bd-forms">
+      <h2 className="section-title"><Scale size={20} strokeWidth={1.8} />서식 · 근거법령</h2>
+      <dl className="benefit-facts">
+        {b.application_forms?.length > 0 && (
+          <><dt>서식</dt><dd className="form-links">{b.application_forms.map((f) => <FormLink key={f.name + f.link} form={f} />)}</dd></>
+        )}
+        {b.legal_basis?.length > 0 && <><dt>근거법령</dt><dd>{b.legal_basis.join(', ')}</dd></>}
+      </dl>
+    </article>
+  )
+  // 넓은 화면 2단: 선정기준은 왼쪽, 신청 방법은 오른쪽. 서식·근거법령은 글이 짧은 쪽 아래에 붙여 빈 공간을 줄인다
+  // (높이는 글자 수로 어림. 신청 단계는 줄마다 제목·여백이 붙어 1.6배로 친다)
+  const criteriaLen = b.criteria_text?.length ?? 0
+  const applyLen = (b.application_method?.length ?? 0) * (steps ? 1.6 : 1)
+  const left = [criteriaCard].filter(Boolean)
+  const right = [applyCard].filter(Boolean)
+  if (formsCard) (criteriaLen <= applyLen ? left : right).push(formsCard)
+
   return (
     <section className="page page-full benefit-detail">
       {back}
@@ -99,40 +138,9 @@ export default function BenefitDetailPage() {
         <li><CalendarDays size={18} /><span>신청기간</span><strong>{period ?? '상시 · 원문 확인'}</strong></li>
       </ul>
 
-      <div className="bd-sections">
-        {b.criteria_text && (
-          <article className="bd-section glass">
-            <h2 className="section-title"><ClipboardList size={20} strokeWidth={1.8} />누가 받을 수 있나요 · 공식 선정기준</h2>
-            <p className="bd-text">{formatCriteria(b.criteria_text)}</p>
-          </article>
-        )}
-
-        {b.application_method && (
-          <article className="bd-section glass">
-            <h2 className="section-title"><FileText size={20} strokeWidth={1.8} />어떻게 신청하나요</h2>
-            {steps ? (
-              <ol className="bd-steps">
-                {steps.map((s, i) => (
-                  <li key={s.label + i}><span className="bd-step-no">{i + 1}</span><div><strong>{s.label}</strong><p>{s.body}</p></div></li>
-                ))}
-              </ol>
-            ) : (
-              <p className="bd-text">{b.application_method}</p>
-            )}
-          </article>
-        )}
-
-        {(b.application_forms?.length > 0 || b.legal_basis?.length > 0) && (
-          <article className="bd-section glass">
-            <h2 className="section-title"><Scale size={20} strokeWidth={1.8} />서식 · 근거법령</h2>
-            <dl className="benefit-facts">
-              {b.application_forms?.length > 0 && (
-                <><dt>서식</dt><dd className="form-links">{b.application_forms.map((f) => <FormLink key={f.name + f.link} form={f} />)}</dd></>
-              )}
-              {b.legal_basis?.length > 0 && <><dt>근거법령</dt><dd>{b.legal_basis.join(', ')}</dd></>}
-            </dl>
-          </article>
-        )}
+      <div className={`bd-sections ${left.length && right.length ? 'two-col' : ''}`}>
+        <div className="bd-col">{left}</div>
+        <div className="bd-col">{right}</div>
       </div>
 
       <div className="bd-actions">

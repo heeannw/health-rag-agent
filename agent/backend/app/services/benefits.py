@@ -78,6 +78,25 @@ def _with_facilities(b: dict) -> dict:
     return {**b, "related_facility_types": types, "related_facility_type": b.get("related_facility_type") or (types[0] if types else None)}
 
 
+def find_by_service(source: str, service_id: str) -> dict | None:
+    """챗봇 인용 출처(data-rag)의 서비스 코드로 혜택 한 건을 찾는다.
+
+    source는 data-rag 구분자(welfare_central | welfare_local) 또는 DB 값(central | local).
+    상세 화면이 쓰는 display·region_scope는 지역 조건 없이 extract_benefits로 채운다.
+    """
+    _load()
+    source = source.removeprefix("welfare_")
+    row = next(
+        (r for r in _rows() if r.get("source") == source and str(r.get("source_service_id") or "").strip() == service_id),
+        None,
+    )
+    if row is None:
+        return None
+    result = _search.extract_benefits([row])
+    item = (result["matched"] + result["needs_review"])[0]
+    return _with_facilities(item)
+
+
 def search(
     province: str | None = None,
     municipality: str | None = None,
