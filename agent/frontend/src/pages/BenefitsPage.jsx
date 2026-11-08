@@ -1,21 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
-  Baby, Brain, ChevronLeft, ChevronRight, HeartPulse, Info, Search, X,
+  ChevronLeft, ChevronRight, Info, Search, X,
 } from 'lucide-react'
 import { getBenefits } from '../api.js'
-import { FACILITY_META } from '../facilityTypes.js'
 import { useRegion } from '../regionContext.js'
 import {
-  LIFE_CYCLES, REVIEW_LABELS, STATUS, audienceOf, benefitPath, hasRegion, iconFor, periodOf,
+  LIFE_CYCLES, REVIEW_LABELS, STATUS, THEMES, audienceOf, benefitPath, hasRegion, iconFor, periodOf, toneFor,
 } from '../benefitMeta.js'
-
-// 가은 데이터의 theme_codes (의료 관련 3개 주제)
-const THEMES = [
-  { code: '010', label: '신체건강', icon: HeartPulse },
-  { code: '020', label: '정신건강', icon: Brain },
-  { code: '080', label: '임신·출산', icon: Baby },
-]
 
 // 검색은 이미 받아온 혜택 안에서 한다. 띄어쓰기는 무시하고, 여러 단어는 모두 들어간 것만(AND)
 const squash = (t) => (t ?? '').replace(/\s+/g, '').toLowerCase()
@@ -37,7 +29,7 @@ function searchBenefits(list, query) {
 
 export default function BenefitsPage() {
   const { region, label: regionLabel, shortLabel } = useRegion()
-  const [lifeCycle, setLifeCycle] = useState('')
+  const [lifeCycles, setLifeCycles] = useState([])
   const [themes, setThemes] = useState([])
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
@@ -69,10 +61,10 @@ export default function BenefitsPage() {
   useEffect(() => {
     if (!region) return
     setError(null)
-    getBenefits({ province: region.province, municipality: region.municipality, life_cycle: lifeCycle, themes })
+    getBenefits({ province: region.province, municipality: region.municipality, life_cycle: lifeCycles, themes })
       .then(setData)
       .catch((e) => setError(e.message))
-  }, [region, lifeCycle, themes])
+  }, [region, lifeCycles, themes])
 
   // '조건 일치'와 '원문 확인 필요'를 한 목록으로 합친다 (일치하는 것 먼저).
   // 원문 확인이 필요한 혜택은 카드에 '○○ 확인' 태그가 붙어서 구분된다
@@ -90,7 +82,11 @@ export default function BenefitsPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
     document.querySelector('.content')?.scrollTo({ top: 0, behavior: 'smooth' })
   }
-  const changeLifeCycle = (v) => { setLifeCycle(v); updateParams({ page: 1 }) }
+  // '' (전체)는 선택을 모두 풀고, 나머지는 켜고 끈다
+  const toggleLifeCycle = (v) => {
+    setLifeCycles((cur) => (!v ? [] : cur.includes(v) ? cur.filter((c) => c !== v) : [...cur, v]))
+    updateParams({ page: 1 })
+  }
   const toggleTheme = (code) => {
     setThemes((t) => (t.includes(code) ? t.filter((c) => c !== code) : [...t, code]))
     updateParams({ page: 1 })
@@ -100,7 +96,7 @@ export default function BenefitsPage() {
     <section className="page page-wide">
       <header className="page-head">
         <span className="eyebrow">혜택 추천</span>
-        <h1>{regionLabel ? `${shortLabel} · ${lifeCycle || '전체 연령'}` : '나에게 맞는 의료·복지 혜택'}</h1>
+        <h1>{regionLabel ? `${shortLabel} · ${lifeCycleTitle(lifeCycles)}` : '나에게 맞는 의료·복지 혜택'}</h1>
         <p>{regionLabel} 주민이 받을 수 있는 혜택을 모았어요. 지역은 왼쪽 메뉴에서 바꿀 수 있어요.</p>
       </header>
 
@@ -128,28 +124,32 @@ export default function BenefitsPage() {
 
       <div className="filter-row">
         <span className="filter-label">연령</span>
-        <div className="segmented" role="tablist" aria-label="생애주기">
-          {LIFE_CYCLES.map(({ value, label, icon: Icon }) => (
+        {/* 여러 개 고를 수 있다(OR). '전체'는 고른 걸 모두 푼다 */}
+        <div className="segmented" role="group" aria-label="생애주기 (여러 개 선택 가능)">
+          {LIFE_CYCLES.map(({ value, label, icon: Icon }) => {
+            const on = value ? lifeCycles.includes(value) : lifeCycles.length === 0
+            return (
             <button
               key={label}
-              role="tab"
-              aria-selected={lifeCycle === value}
-              className={lifeCycle === value ? 'active' : ''}
-              onClick={() => changeLifeCycle(value)}
+              type="button"
+              aria-pressed={on}
+              className={on ? 'active' : ''}
+              onClick={() => toggleLifeCycle(value)}
             >
               <Icon size={16} strokeWidth={1.8} />{label}
             </button>
-          ))}
+            )
+          })}
         </div>
       </div>
       <div className="filter-row">
         <span className="filter-label">분야</span>
         <div className="filter-chips">
-        {THEMES.map(({ code, label, icon: Icon }) => (
+        {THEMES.map(({ code, label, icon: Icon, tone }) => (
           <button
             key={code}
             aria-pressed={themes.includes(code)}
-            className={`toggle ${themes.includes(code) ? 'on' : ''}`}
+            className={`toggle ${tone} ${themes.includes(code) ? 'on' : ''}`}
             onClick={() => toggleTheme(code)}
           >
             <Icon size={15} strokeWidth={1.8} />{label}
@@ -198,6 +198,12 @@ export default function BenefitsPage() {
 
 const PAGE_SIZES = [10, 50, 100]
 
+/** 제목에 쓸 연령 이름. 화면 표기(label)로, LIFE_CYCLES 순서대로 '영유아, 아동' 처럼 잇는다 */
+function lifeCycleTitle(selected) {
+  if (!selected.length) return '전체 연령'
+  return LIFE_CYCLES.filter((c) => c.value && selected.includes(c.value)).map((c) => c.label).join(', ')
+}
+
 /** 1 … 4 5 [6] 7 8 … 20 처럼 현재 페이지 주변만 번호로 보여준다 */
 function pageNumbers(page, count) {
   const set = new Set([1, count, page - 2, page - 1, page, page + 1, page + 2])
@@ -233,18 +239,16 @@ function Pagination({ page, pageCount, onChange }) {
   )
 }
 
-// 한 줄에 하나씩: 이름·구분·요약 한 줄 | 대상·지역·기간 | (가까운 기관 바로가기).
+// 한 줄에 하나씩: 이름·구분·요약 한 줄 | 대상·지역·기간.
 // 선정기준·신청방법 같은 긴 원문은 상세 페이지에서 보여준다
 function BenefitRow({ b, region }) {
   const Icon = iconFor(b)
   const status = STATUS[b.application_status] ?? STATUS.unknown
-  const facility = FACILITY_META[b.related_facility_type]
-  const FacilityIcon = facility?.icon
   const period = periodOf(b)
   return (
     <li className="benefit-row glass">
       <Link className="benefit-row-link" to={benefitPath(b, region)} state={{ benefit: b }}>
-        <span className="icon-tile blue"><Icon size={20} strokeWidth={1.8} /></span>
+        <span className={`icon-tile ${toneFor(b)}`}><Icon size={20} strokeWidth={1.8} /></span>
         <div className="br-main">
           <div className="br-title">
             <h3>{b.name}</h3>
@@ -262,13 +266,6 @@ function BenefitRow({ b, region }) {
         </dl>
         <ChevronRight size={18} className="br-chev" />
       </Link>
-      {/* 바로가기가 없는 줄도 같은 자리를 비워 둬서 대상·지역 칸이 줄마다 어긋나지 않게 */}
-      {facility ? (
-        <Link className="br-cta" to={`/map?types=${b.related_facility_type}`} title={`가까운 ${facility.label} 보기`}>
-          {FacilityIcon && <FacilityIcon size={18} strokeWidth={1.8} />}
-          가까운 {facility.label}
-        </Link>
-      ) : <span className="br-cta empty" aria-hidden="true" />}
     </li>
   )
 }

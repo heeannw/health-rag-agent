@@ -70,6 +70,36 @@ def _split_region(region: str) -> tuple[str, str | None]:
     return province, municipality or None
 
 
+def _region_in_question(query: str, region: str | None) -> str | None:
+    """질문에 다른 지역이 나오면 그 지역을 쓴다 ('내 지역'은 노원구인데 '중랑구에 살고 있어' 같은 경우).
+
+    시군구는 '중랑구'처럼 전체 이름만 본다. '중랑'처럼 줄인 이름까지 보면 '고령자'(고령군),
+    '영양'(영양군) 같은 일반 단어가 지역으로 잡힌다. '중구'처럼 여러 시도에 있는 이름은
+    질문에 나온 시도 → 내 시도 순으로 고르고, 그래도 하나로 안 정해지면 원래 지역을 쓴다."""
+    from app.services.facilities import REGIONS  # noqa: PLC0415
+
+    current = _split_region(region)[0] if region else None
+    provinces = [
+        p for p in dict.fromkeys(r["province"] for r in REGIONS)
+        if any(n in query for n in (p, *PROVINCE_ALIASES.get(p, ())))
+    ]
+    found = [
+        r for r in REGIONS
+        if r["municipality"] and re.search(rf"(?<![가-힣]){re.escape(r['municipality'])}", query)
+    ]
+    for preferred in (provinces, [current]):
+        narrowed = [r for r in found if r["province"] in preferred]
+        if narrowed:
+            found = narrowed
+            break
+    places = {(r["province"], r["municipality"]) for r in found}
+    if len(places) == 1:
+        return " ".join(places.pop())
+    if not places and len(provinces) == 1 and provinces[0] != current:
+        return provinces[0]  # '부산에 사는데'처럼 시도만 말한 경우
+    return region
+
+
 def _hit_place(meta: dict) -> str | None:
     """검색 결과가 어느 지역 자료인지 '시도 시군구 …' 문자열로. 전국 자료나 알 수 없으면 None."""
     source = meta.get("source")
@@ -98,6 +128,10 @@ def _region_rank(meta: dict, province: str, municipality: str | None) -> int:
         return 0
     if municipality and municipality in place:
         return 3
+    # 다른 시군구의 지자체 사업은 그 주민만 받을 수 있다 (병원·센터 같은 기관은 옆 구도 갈 수 있어 둔다).
+    # '서울특별시'처럼 시도 전체 사업은 그대로 둔다
+    if municipality and meta.get("source") == "welfare_local" and place.strip().count(" ") >= 1:
+        return 0
     return 2
 
 
@@ -159,6 +193,17 @@ def _regional_search(query_text: str, n_results: int = 5, **kwargs) -> list[dict
 
 # ── data-rag 연결 ─────────────────────────────────────
 
+# data-rag 프롬프트는 "검색결과에 없으면 못 찾았다고 하라"만 있어서, '노원구 치매 무료 검사'처럼
+# 전국 공통 제도(치매안심센터 무료 진단검사)는 찾았는데 노원구 기관만 없을 때도 통째로 거절했다.
+# 답변에 문서 제목이 안 나오니 출처도 0건이 된다. 찾은 만큼은 안내하도록 규칙을 덧붙인다
+PARTIAL_ANSWER_RULES = """
+- 질문 앞 [지역]은 사용자가 사는 지역입니다. 질문이 그 지역의 기관·장소를 찾는데 검색결과에 없으면,
+  전국 공통 제도나 같은 시도의 기관처럼 관련된 내용을 안내하고, 그 지역 기관은 찾지 못했다고 한 줄로 밝힌 뒤
+  제도 안내에 나온 문의처(거주지 보건소·주민센터 등)를 알려 주세요. 검색결과로 답할 수 있는 질문이면
+  찾지 못한 지역 자료를 굳이 언급하지 않습니다.
+- "관련 정보를 찾지 못했습니다"는 질문과 관련된 내용이 검색결과에 전혀 없을 때만 씁니다.
+- 본문과 [출처]에 문서 제목을 쓸 때는 검색결과의 제목을 바꾸지 말고 그대로 씁니다."""
+
 _load_lock = threading.Lock()
 
 
@@ -173,14 +218,24 @@ def _load():
         try:
             if str(DATA_RAG_DIR) not in sys.path:
                 sys.path.insert(0, str(DATA_RAG_DIR))
+            import pipeline.embed as embed  # noqa: PLC0415
             import pipeline.generate as generate  # noqa: PLC0415
             import pipeline.hybrid_search as hybrid  # noqa: PLC0415
         except Exception as e:  # 의존성 미설치 등
             raise RagUnavailable(f"data-rag 불러오기 실패 ({type(e).__name__}: {e})") from e
+        # BGE-M3와 BM25도 이 잠금 안에서 불러온다. data-rag의 get_model()엔 잠금이 없어서, 서버 켜자마자
+        # 질문하면 warm_up 스레드와 질문 스레드가 모델을 동시에 불러오다 'Cannot copy out of meta tensor'로 죽었다
+        try:
+            embed.get_model()
+            hybrid._get_bm25_index()
+        except Exception as e:
+            raise RagUnavailable(f"검색 모델·인덱스 불러오기 실패 ({type(e).__name__}: {e})") from e
         # 원본은 hybrid_search 모듈에서 가져온다 (generate 쪽 이름은 이미 바꿔 끼운 것일 수 있다)
         _hybrid_search = hybrid.hybrid_search
         # generate_answer가 모듈 안에서 부르는 hybrid_search를 지역 우선 검색으로 바꿔 끼운다
         generate.hybrid_search = _regional_search
+        if PARTIAL_ANSWER_RULES not in generate.SYSTEM_PROMPT:
+            generate.SYSTEM_PROMPT += PARTIAL_ANSWER_RULES
         _generate_answer = generate.generate_answer
         _guard_llm.extend(_guard_client(generate))
 
@@ -219,6 +274,10 @@ def ask(query: str, n_results: int, region: str | None = None, history: list[dic
     if reason:
         logger.info("질문 차단 (%s): %s", reason, query[:80])
         return guard.blocked_response(reason)
+    asked = _region_in_question(query, region)
+    if asked != region:
+        logger.info("질문에 나온 지역으로 검색: %s → %s", region, asked)
+        region = asked
     if region:
         # 답변도 지역 맞춤이 되도록 질문 앞에 사용자가 고른 지역을 붙인다
         query = f"[{region}] {query}"

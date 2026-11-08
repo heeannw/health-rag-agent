@@ -1,5 +1,5 @@
 import {
-  Baby, Briefcase, GraduationCap, HeartPulse, School, Smile, Sparkle, Users,
+  Baby, Brain, Briefcase, GraduationCap, HeartPulse, School, Smile, Sparkle, Users,
 } from 'lucide-react'
 
 // 가은 데이터 life_cycle_names 원문 분류명 (복지로 생애주기)
@@ -11,7 +11,16 @@ export const LIFE_CYCLES = [
   { value: '청년', label: '청년', icon: GraduationCap },
   { value: '중장년', label: '중장년', icon: Briefcase },
   { value: '노년', label: '노년', icon: Users },
-  { value: '임신·출산', label: '임신·출산', icon: HeartPulse },
+  // DB 원문 표기는 가운뎃점 앞뒤에 공백이 있다 ('임신 · 출산')
+  { value: '임신 · 출산', label: '임신·출산', icon: HeartPulse },
+]
+
+// 가은 데이터의 theme_codes (의료 관련 3개 주제만 DB에 있다).
+// tone은 분야 칩을 골랐을 때 색이자 혜택 목록·상세 아이콘 타일 색 (index.css .toggle.on.* / .icon-tile.*)
+export const THEMES = [
+  { code: '010', label: '신체건강', icon: HeartPulse, tone: 'pink' },
+  { code: '020', label: '정신건강', icon: Brain, tone: 'violet' },
+  { code: '080', label: '임신·출산', icon: Baby, tone: 'mint' },
 ]
 
 export const STATUS = {
@@ -24,7 +33,11 @@ export const STATUS = {
 // search_benefits가 원문 확인으로 분리한 조건 이름
 export const REVIEW_LABELS = { life_cycle_names: '생애주기', target_group_names: '대상특성', region: '지역' }
 
-export const iconFor = (b) => LIFE_CYCLES.find((c) => c.value && b.life_cycle_names?.includes(c.value))?.icon ?? HeartPulse
+// 혜택의 분야로 아이콘·색을 고른다. 분야가 여러 개면 THEMES 순서(신체건강 → 정신건강 → 임신·출산)로 앞의 것.
+// DB상 분야 없는 혜택은 없지만, 혹시 없으면 회색 하트
+const themeOf = (b) => THEMES.find((t) => b.theme_codes?.includes(t.code))
+export const iconFor = (b) => themeOf(b)?.icon ?? HeartPulse
+export const toneFor = (b) => themeOf(b)?.tone ?? 'gray'
 
 // 둘 다 원문 미확인이면 '대상 원문 확인 · 대상 원문 확인'처럼 반복되지 않게 한 번만
 export const audienceOf = (b) => [...new Set([b.display.life_cycle, b.display.target_group])].join(' · ')

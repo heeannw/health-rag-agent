@@ -8,7 +8,7 @@ import { getBenefits } from '../api.js'
 import { FACILITY_META } from '../facilityTypes.js'
 import { useRegion } from '../regionContext.js'
 import FormLink from '../components/FormLink.jsx'
-import { REVIEW_LABELS, STATUS, audienceOf, hasRegion, iconFor, periodOf } from '../benefitMeta.js'
+import { REVIEW_LABELS, STATUS, audienceOf, hasRegion, iconFor, periodOf, toneFor } from '../benefitMeta.js'
 
 // 신청방법 원문은 '신청기관: … 조사기관: … 결정기관: …'이 한 줄로 이어져 와서 단계별로 나눈다
 const STEP_RE = /([가-힣]+기관(?:목록)?)\s*:/g
@@ -115,7 +115,7 @@ export default function BenefitDetailPage() {
       {back}
 
       <div className="detail-hero glass">
-        <span className="icon-tile lg blue"><Icon size={28} strokeWidth={1.6} /></span>
+        <span className={`icon-tile lg ${toneFor(b)}`}><Icon size={28} strokeWidth={1.6} /></span>
         <div className="detail-hero-text">
           <div className="benefit-tags">
             <span className={`tag ${b.source === 'central' ? 'blue' : 'pink'}`}>{b.source === 'central' ? '중앙부처' : '지자체'}</span>

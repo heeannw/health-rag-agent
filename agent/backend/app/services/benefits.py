@@ -109,9 +109,13 @@ def search(
     if themes:
         rows = [r for r in rows if set(themes) & set(r.get("theme_codes") or [])]
     result = _search.extract_benefits(rows, life_cycles, target_groups, province, municipality)
+    # 생애주기·대상특성을 골랐을 때 그 분류가 아예 비어 있는 혜택(예: 영유아 선택 시 '농업인 건강보험료')은
+    # 목록에서 뺀다. 분류 없는 혜택은 '전체'에서만 보인다. 지역 미상은 그대로 '지역 확인'으로 둔다.
+    chosen = {f for f, sel in (("life_cycle_names", life_cycles), ("target_group_names", target_groups)) if sel}
+    needs_review = [b for b in result.get("needs_review", []) if not chosen & set(b.get("review_fields") or [])]
     return {
         **result,
         "matched": [_with_facilities(b) for b in result.get("matched", [])],
-        "needs_review": [_with_facilities(b) for b in result.get("needs_review", [])],
+        "needs_review": [_with_facilities(b) for b in needs_review],
         "notice": NOTICE,
     }
