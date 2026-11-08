@@ -28,6 +28,10 @@ export const getRegions = () => request('/api/regions')
 /** params: { province, municipality, life_cycle, themes: string[] } */
 export const getBenefits = (params = {}) => request(`/api/benefits${qs(params)}`)
 
+/** 챗봇 인용 출처의 복지서비스 코드로 혜택 한 건 (source: welfare_central | welfare_local) */
+export const getBenefitByService = (source, serviceId) =>
+  request(`/api/benefits/by-service/${encodeURIComponent(source)}/${encodeURIComponent(serviceId)}`)
+
 /** params: { types: string[], q, province, municipality, lat, lng } */
 export const getFacilities = (params = {}) => request(`/api/facilities${qs(params)}`)
 

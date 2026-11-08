@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.schemas import BenefitsResponse, ChatRequest, ChatResponse, Facility, Region
+from app.schemas import Benefit, BenefitsResponse, ChatRequest, ChatResponse, Facility, Region
 from app.services import benefits as benefit_search
 from app.services import rag
 from app.services.facilities import FACILITIES, REGIONS
@@ -86,6 +86,17 @@ async def benefits(
         benefit_search.search,
         province, municipality, _split(life_cycle), _split(target_group), _split(themes),
     )
+
+
+@app.get("/api/benefits/by-service/{source}/{service_id}", response_model=Benefit)
+async def benefit_by_service(source: str, service_id: str):
+    """챗봇 인용 출처의 복지서비스 코드(source_service_id)로 혜택 한 건 조회."""
+    if source not in ("welfare_central", "welfare_local", "central", "local"):
+        raise HTTPException(400, "source는 welfare_central 또는 welfare_local 이어야 합니다.")
+    found = await run_in_threadpool(benefit_search.find_by_service, source, service_id.strip())
+    if found is None:
+        raise HTTPException(404, "혜택을 찾을 수 없습니다")
+    return found
 
 
 @app.get("/api/facilities", response_model=list[Facility])
