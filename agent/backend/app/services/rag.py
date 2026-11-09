@@ -70,22 +70,34 @@ def _split_region(region: str) -> tuple[str, str | None]:
     return province, municipality or None
 
 
-def _region_in_question(query: str, region: str | None) -> str | None:
-    """질문에 다른 지역이 나오면 그 지역을 쓴다 ('내 지역'은 노원구인데 '중랑구에 살고 있어' 같은 경우).
+# '서울', '세종'처럼 두 글자 시도 별칭 뒤에 올 수 있는 말. 이것 말고 다른 한글이 바로 붙으면
+# ('세종대왕', '서울대병원') 지역으로 보지 않는다
+_ALIAS_TAIL = r"(?=$|[^가-힣]|에서|에|의|은|는|이|도|시|으로|로|쪽|지역|사는|살|까지|이랑|랑|하고|권)"
+# '경기도 광주'는 경기도 광주시다. 그냥 두면 '광주'가 전남광주통합특별시로도 잡혀 시도가 둘이 된다
+_GYEONGGI_GWANGJU = re.compile(r"경기도?\s*광주(?:시)?")
+
+
+def _mentions_province(text: str, province: str) -> bool:
+    for name in (province, *PROVINCE_ALIASES.get(province, ())):
+        tail = _ALIAS_TAIL if len(name) <= 2 else ""
+        if re.search(rf"(?<![가-힣]){re.escape(name)}{tail}", text):
+            return True
+    return False
+
+
+def _mentioned_region(text: str, current: str | None) -> str | None:
+    """글에 나온 지역 ('시도 시군구' 또는 '시도'). 없거나 하나로 안 정해지면 None.
 
     시군구는 '중랑구'처럼 전체 이름만 본다. '중랑'처럼 줄인 이름까지 보면 '고령자'(고령군),
     '영양'(영양군) 같은 일반 단어가 지역으로 잡힌다. '중구'처럼 여러 시도에 있는 이름은
-    질문에 나온 시도 → 내 시도 순으로 고르고, 그래도 하나로 안 정해지면 원래 지역을 쓴다."""
+    글에 나온 시도 → 내 시도(current) 순으로 고른다."""
     from app.services.facilities import REGIONS  # noqa: PLC0415
 
-    current = _split_region(region)[0] if region else None
-    provinces = [
-        p for p in dict.fromkeys(r["province"] for r in REGIONS)
-        if any(n in query for n in (p, *PROVINCE_ALIASES.get(p, ())))
-    ]
+    text = _GYEONGGI_GWANGJU.sub("경기도 광주시", text)
+    provinces = [p for p in dict.fromkeys(r["province"] for r in REGIONS) if _mentions_province(text, p)]
     found = [
         r for r in REGIONS
-        if r["municipality"] and re.search(rf"(?<![가-힣]){re.escape(r['municipality'])}", query)
+        if r["municipality"] and re.search(rf"(?<![가-힣]){re.escape(r['municipality'])}", text)
     ]
     for preferred in (provinces, [current]):
         narrowed = [r for r in found if r["province"] in preferred]
@@ -95,8 +107,23 @@ def _region_in_question(query: str, region: str | None) -> str | None:
     places = {(r["province"], r["municipality"]) for r in found}
     if len(places) == 1:
         return " ".join(places.pop())
-    if not places and len(provinces) == 1 and provinces[0] != current:
+    if not places and len(provinces) == 1:
         return provinces[0]  # '부산에 사는데'처럼 시도만 말한 경우
+    return None
+
+
+def _region_in_question(query: str, region: str | None, history: list[dict] | None = None) -> str | None:
+    """질문에 다른 지역이 나오면 그 지역을 쓴다 ('내 지역'은 노원구인데 '중랑구에 살고 있어' 같은 경우).
+
+    이번 질문에 지역이 없으면 이전 사용자 질문을 최근 것부터 본다. 안 그러면 '중랑구 치매 검사' 다음
+    '거기 보건소는 어디야?'가 다시 내 지역(노원구)으로 검색된다. 아무 데도 없으면 원래 지역."""
+    current = _split_region(region)[0] if region else None
+    past = [t.get("content") or "" for t in reversed(history or []) if t.get("role") == "user"]
+    for text in (query, *past):
+        found = _mentioned_region(text, current)
+        if found:
+            # 내 시도만 말한 경우('서울에서')는 내 시군구를 그대로 둔다
+            return region if found == current else found
     return region
 
 
@@ -274,7 +301,7 @@ def ask(query: str, n_results: int, region: str | None = None, history: list[dic
     if reason:
         logger.info("질문 차단 (%s): %s", reason, query[:80])
         return guard.blocked_response(reason)
-    asked = _region_in_question(query, region)
+    asked = _region_in_question(query, region, history)
     if asked != region:
         logger.info("질문에 나온 지역으로 검색: %s → %s", region, asked)
         region = asked

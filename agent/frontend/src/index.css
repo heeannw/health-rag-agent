@@ -292,12 +292,6 @@ a { color: inherit; }
 .select select { border: none; background: transparent; height: 100%; padding-right: 8px; font-weight: 600; color: var(--text); }
 .select select:focus { outline: none; }
 
-.benefit-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 16px; }
-.benefit-card { display: flex; flex-direction: column; gap: 12px; padding: 22px; border-radius: var(--r-lg); transition: transform 0.2s, background 0.2s; }
-.benefit-card:hover { transform: translateY(-3px); background: var(--glass-strong); }
-.benefit-top { display: flex; justify-content: space-between; align-items: center; }
-.benefit-card h3 { font-size: 18px; font-weight: 800; line-height: 1.4; }
-.benefit-card > p { font-size: 14px; line-height: 1.65; color: #34485A; }
 .criteria { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; border-radius: var(--r-sm); background: rgba(215, 246, 247, 0.75); font-size: 13px; line-height: 1.5; }
 .criteria span { font-size: 11px; font-weight: 700; color: var(--mint-ink); }
 .benefit-foot { display: flex; justify-content: space-between; align-items: center; margin-top: auto; padding-top: 4px; font-size: 13px; color: var(--muted); }
@@ -348,28 +342,26 @@ a { color: inherit; }
 .facility-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .facility-name { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
 .facility-name strong { flex: 1; min-width: 0; font-size: 15px; font-weight: 800; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.facility-text small { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* 기관 유형 이름은 지도 핀과 같은 색으로 */
-.facility-text small b { font-weight: 700; color: var(--pin-blue); }
-.facility-text small b.mint { color: var(--mint-ink); }
-.facility-text small b.pink { color: var(--pink-ink); }
-.facility-text small b.violet { color: var(--violet-ink); }
 .chev { color: var(--muted); flex: none; }
 .map-panel .chev { color: rgba(16, 32, 48, 0.28); transition: color 0.2s; }
 
 /* ── 기관 상세 ────────────────────────────── */
 .back { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 16px; font-size: 14px; font-weight: 600; color: var(--muted); text-decoration: none; }
 .back:hover { color: var(--text); }
-.detail-hero { display: flex; align-items: center; gap: 20px; padding: 28px; border-radius: var(--r-xl); margin-bottom: 16px; }
-.detail-hero h1 { font-size: 30px; font-weight: 800; letter-spacing: -0.03em; margin-top: 8px; }
-.detail-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 16px; }
-.info-list { padding: 8px 20px; border-radius: var(--r-lg); }
+.detail-card {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  border-radius: var(--r-xl); overflow: hidden; margin-bottom: 16px;
+}
+.detail-main { display: flex; flex-direction: column; gap: 18px; padding: 28px; min-width: 0; }
+.detail-hero { display: flex; align-items: center; gap: 16px; }
+.detail-hero h1 { font-size: 28px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.25; }
+.info-list { padding: 0; border-top: 1px solid var(--line-soft); }
 .info-list li { display: grid; grid-template-columns: 20px 64px 1fr; gap: 10px; align-items: start; padding: 14px 0; font-size: 14px; }
 .info-list li + li { border-top: 1px solid var(--line-soft); }
 .info-list svg { color: var(--accent-blue); }
 .info-list span { color: var(--muted); }
 .info-list strong { font-weight: 600; }
-.detail-map { border-radius: var(--r-lg); overflow: hidden; min-height: 300px; display: flex; }
+.detail-map { min-height: 380px; display: flex; border-left: 1px solid var(--line-soft); }
 .detail-map .map { border-radius: 0; }
 .mini-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
 .mini-list li { display: flex; flex-direction: column; gap: 6px; padding: 18px; border-radius: var(--r-md); font-size: 14px; }
@@ -566,7 +558,18 @@ a { color: inherit; }
 .search:focus-within { border-color: var(--blue-ink); }
 .search input:focus { outline: none; }
 .type-toggles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; padding: 0 16px 12px; }
-.type-toggles .toggle { justify-content: center; padding: 8px 10px; white-space: nowrap; }
+/* 꺼진 칩도 글씨·테두리가 패널 배경에 묻히지 않게 진하게 */
+.type-toggles .toggle {
+  justify-content: center; padding: 9px 10px; white-space: nowrap;
+  background: #fff; border-color: rgba(16, 32, 48, 0.14); color: rgba(16, 32, 48, 0.82);
+  font-size: 14px; font-weight: 700; box-shadow: 0 1px 2px rgba(16, 32, 48, 0.06);
+}
+.type-toggles .toggle:hover { color: var(--text); }
+/* 켜진 칩은 핀 색 테두리 + 진한 바탕으로 꺼진 칩(흰색)과 확실히 구분 */
+.type-toggles .toggle.on.blue { background: rgba(113, 186, 246, 0.32); border-color: var(--pin-blue); color: var(--blue-ink); }
+.type-toggles .toggle.on.mint { background: rgba(42, 154, 149, 0.18); border-color: var(--pin-mint); color: var(--mint-ink); }
+.type-toggles .toggle.on.pink { background: rgba(255, 201, 202, 0.7); border-color: var(--pin-pink); color: var(--pink-ink); }
+.type-toggles .toggle.on.violet { background: rgba(167, 146, 240, 0.3); border-color: var(--pin-violet); color: var(--violet-ink); }
 .result-count { padding: 10px 20px 8px; font-size: 12px; font-weight: 600; color: var(--muted); border-top: 1px solid var(--line-soft); }
 .result-count strong { font-weight: 800; color: var(--text); }
 .grades { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
@@ -644,12 +647,17 @@ a { color: inherit; }
 /* ── 기관 상세 추가 요소 ───────────────────── */
 .detail-hero-text { flex: 1; min-width: 0; }
 .detail-hero-text p { margin-top: 6px; font-size: 14px; color: var(--muted); }
-.detail-actions { display: flex; flex-direction: column; gap: 8px; flex: none; }
+.detail-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.detail-actions .btn { flex: 1 1 auto; justify-content: center; }
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 42px; padding: 0 18px;
   border-radius: var(--r-sm); background: #fff; border: 1px solid var(--line); font-size: 14px; font-weight: 700; text-decoration: none; color: var(--text);
 }
 .btn.primary { background: var(--accent-blue); border-color: transparent; color: #0B2A44; }
+/* 카카오맵 길찾기: 흰 바탕 + 카카오 노랑 테두리 (노랑 글씨는 안 보여서 글씨는 진한 갈색) */
+.btn.kakao { background: #fff; border: 2px solid #FEE500; color: #3C1E1E; }
+.btn.kakao svg { color: #3C1E1E; }
+.btn.kakao:hover { background: #FFFBE0; }
 .btn.disabled { color: var(--muted); font-weight: 500; }
 /* 챗봇에 물어보기: 기관 상세 상단 버튼 중 하나. 사이트의 진한 강조 버튼과 같은 톤 */
 .btn.ask { background: var(--text); border-color: transparent; color: #fff; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
@@ -745,8 +753,9 @@ a { color: inherit; }
   .region-trigger { max-width: 128px; }
   /* 모바일은 오른쪽 위 버튼 아래로 화면 너비만큼 펼친다 */
   .region-pop { position: fixed; top: 60px; left: 12px; right: 12px; width: auto; }
-  .detail-grid { grid-template-columns: 1fr; }
-  .detail-hero { padding: 20px; }
+  .detail-card { grid-template-columns: 1fr; }
+  .detail-map { min-height: 260px; border-left: none; border-top: 1px solid var(--line-soft); }
+  .detail-main { padding: 20px; }
   .detail-hero h1 { font-size: 24px; }
 }
 
@@ -767,36 +776,51 @@ a { color: inherit; }
 .benefit-card:hover .benefit-more { text-decoration: underline; }
 .clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 button.back { padding: 0; border: none; background: none; cursor: pointer; font-family: inherit; }
-.benefit-detail .detail-hero { align-items: flex-start; }
-.benefit-detail .detail-hero h1 { margin-top: 10px; }
-.benefit-detail .detail-hero-text .lead { margin-top: 10px; font-size: 15px; line-height: 1.7; color: #34485A; }
-.bd-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; padding: 6px; border-radius: var(--r-lg); margin-bottom: 16px; }
-.bd-facts.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.bd-facts li { display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 10px; row-gap: 2px; padding: 14px 16px; }
-.bd-facts li + li { border-left: 1px solid var(--line-soft); }
-.bd-facts svg { grid-row: span 2; color: var(--blue-ink); margin-top: 2px; }
-.bd-facts span { font-size: 12px; font-weight: 700; color: var(--muted); }
-.bd-facts strong { font-size: 14px; font-weight: 700; line-height: 1.45; }
-.bd-sections { display: flex; flex-direction: column; gap: 16px; }
-.bd-section { padding: 22px 24px; border-radius: var(--r-lg); }
-.bd-section .section-title { margin: 0 0 14px; }
-.bd-text { font-size: 14px; line-height: 1.8; color: #2A3D4E; white-space: pre-line; word-break: keep-all; overflow-wrap: anywhere; }
+/* 혜택 상세: 칸을 나누지 않은 카드 하나. 글 읽기 좋게 폭을 줄이고, 블록 사이는 가는 선으로만 나눈다 */
+/* 양옆·아래 여백 없이 본문 영역을 꽉 채운다. 글이 짧아도 카드가 화면 바닥(사이드바 바닥과 같은 높이)까지 내려온다 */
+.page.benefit-detail {
+  max-width: none; display: flex; flex-direction: column;
+  min-height: calc(100vh - 40px); padding: 8px 0 0;
+}
+.bd-card { flex: 1; display: flex; flex-direction: column; padding: 32px 40px; border-radius: var(--r-xl); }
+.bd-card .data-source { margin-top: 14px; }
+@media (max-width: 860px) {
+  .page.benefit-detail { min-height: 0; padding-bottom: 24px; }
+}
+.bd-head { display: flex; align-items: flex-start; gap: 20px; }
+.bd-head-text { flex: 1; min-width: 0; }
+.bd-head h1 { margin-top: 10px; font-size: 28px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.3; word-break: keep-all; }
+.bd-head .lead { margin-top: 10px; font-size: 16px; line-height: 1.7; color: #34485A; }
+.bd-info { display: flex; flex-wrap: wrap; gap: 8px 28px; margin: 20px 0 0; padding: 14px 18px; border-radius: var(--r-md); background: rgba(255, 255, 255, 0.55); }
+.bd-info div { display: flex; align-items: center; gap: 10px; }
+.bd-info dt { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 700; color: var(--muted); }
+.bd-info dt svg { color: var(--blue-ink); }
+.bd-info dd { margin: 0; font-size: 15px; font-weight: 700; }
+.bd-block { margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--line-soft); }
+.bd-block .section-title { margin: 0 0 14px; font-size: 20px; }
+.bd-audience { margin-bottom: 12px; }
+.bd-audience .tag { font-size: 13px; }
+.bd-text { font-size: 16px; line-height: 1.8; color: #2A3D4E; white-space: pre-line; word-break: keep-all; overflow-wrap: anywhere; }
 .bd-steps { display: flex; flex-direction: column; gap: 14px; margin: 0; padding: 0; list-style: none; }
 .bd-steps li { display: flex; gap: 12px; }
-.bd-steps strong { display: block; font-size: 14px; font-weight: 800; margin-bottom: 2px; }
-.bd-steps p { font-size: 14px; line-height: 1.65; color: #34485A; word-break: keep-all; }
+.bd-steps strong { display: block; font-size: 16px; font-weight: 800; margin-bottom: 2px; }
+.bd-steps p { font-size: 16px; line-height: 1.65; color: #34485A; word-break: keep-all; }
 .bd-step-no {
-  flex: none; display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
-  background: var(--accent-blue); color: #0B2A44; font-size: 13px; font-weight: 800;
+  flex: none; display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%;
+  background: var(--accent-blue); color: #0B2A44; font-size: 14px; font-weight: 800;
 }
-.bd-section .benefit-facts { border-top: none; padding-top: 0; font-size: 14px; grid-template-columns: 72px 1fr; }
-.bd-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-top: 16px; }
+.bd-block .benefit-facts { border-top: none; padding-top: 0; font-size: 16px; grid-template-columns: 84px 1fr; }
+/* 카드가 바닥까지 늘어나면 버튼은 카드 맨 아래에 붙는다 */
+.bd-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-top: auto; padding-top: 28px; }
 button.benefit-cta { border: none; cursor: pointer; font-family: inherit; gap: 8px; justify-content: center; }
 .benefit-cta.dark { background: var(--text); color: #fff; }
+/* 혜택 상세 버튼 세 개가 한눈에 구분되게: 원문(바깥 사이트)은 흰 바탕 파란 테두리, 기관 찾기는 민트, 챗봇은 진한 색 */
+.benefit-cta.outline { background: #fff; color: var(--blue-ink); box-shadow: inset 0 0 0 1.5px var(--accent-blue); }
+.benefit-cta.mint { background: var(--main); color: var(--mint-ink); box-shadow: inset 0 0 0 1.5px rgba(23, 103, 107, 0.25); }
 @media (max-width: 720px) {
-  .bd-facts, .bd-facts.two { grid-template-columns: 1fr; }
-  .bd-facts li + li { border-left: none; border-top: 1px solid var(--line-soft); }
-  .bd-section { padding: 18px; }
+  .bd-card { padding: 20px 18px; }
+  .bd-head { flex-wrap: wrap; gap: 14px; }
+  .bd-head h1 { font-size: 23px; }
 }
 
 /* ── 혜택 검색 ───────────────────────── */
@@ -811,52 +835,31 @@ button.benefit-cta { border: none; cursor: pointer; font-family: inherit; gap: 8
 /* ── 넓은 화면: 혜택 목록·혜택 상세·기관 상세는 화면 폭을 채운다 ── */
 .page.page-wide, .page.page-full { max-width: 1480px; }
 
-/* 혜택 상세 카드: 좁은 화면에선 한 줄로 (선정기준 → 신청 방법 → 서식 순서) */
-.bd-col { display: contents; }
-.bd-criteria { order: 1; }
-.bd-apply { order: 2; }
-.bd-forms { order: 3; }
-
-/* 넓은 화면: 선정기준은 왼쪽, 신청 방법은 오른쪽, 서식은 짧은 쪽 아래.
-   두 단의 바닥을 맞추려고 각 단의 마지막 카드가 남는 높이를 채운다 */
-@media (min-width: 1100px) {
-  .page-full .bd-sections.two-col { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); align-items: stretch; }
-  .page-full .bd-sections.two-col .bd-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
-  .page-full .bd-sections.two-col .bd-col > :last-child { flex: 1; }
+/* ── 혜택 목록: 카드 격자 (넓은 화면 한 줄 5장 → 기본 10개씩이면 2줄) + 페이지 나눔 ── */
+.benefit-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; margin: 0; padding: 0; list-style: none; }
+@media (max-width: 1279px) { .benefit-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 900px) { .benefit-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .benefit-grid { grid-template-columns: 1fr; } }
+.benefit-card { display: flex; border-radius: var(--r-lg); transition: background 0.15s, transform 0.15s; }
+.benefit-card:hover { background: var(--glass-strong); transform: translateY(-2px); }
+.bc-link { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; padding: 18px; color: inherit; text-decoration: none; }
+.bc-link:focus-visible { outline: 2px solid var(--blue-ink); outline-offset: -4px; border-radius: var(--r-lg); }
+.bc-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.bc-tags { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
+.bc-link > .bc-tags { justify-content: flex-start; }
+.bc-tags .tag { padding: 2px 8px; font-size: 11px; }
+.benefit-card h3 { font-size: 16px; font-weight: 800; line-height: 1.4; word-break: keep-all; overflow-wrap: anywhere; }
+.benefit-card p { font-size: 13px; line-height: 1.6; color: #45586A; }
+.clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+/* 대상·지역·기간과 '자세히 보기'는 카드 바닥에 붙여서 줄마다 높이가 맞게 */
+.bc-meta {
+  display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 4px 8px; margin: auto 0 0; padding-top: 10px;
+  border-top: 1px solid var(--line-soft); font-size: 12px;
 }
-
-/* ── 혜택 목록: 한 줄에 하나씩 훑어보는 목록 + 페이지 나눔 ─────────── */
-.benefit-list { display: flex; flex-direction: column; gap: 10px; }
-.benefit-row {
-  display: flex; align-items: stretch; border-radius: var(--r-lg); overflow: hidden;
-  transition: background 0.15s, transform 0.15s;
-}
-.benefit-row:hover { background: var(--glass-strong); transform: translateY(-1px); }
-.benefit-row-link {
-  flex: 1; min-width: 0; display: grid; align-items: center; gap: 18px; padding: 16px 20px;
-  grid-template-columns: 44px minmax(0, 1fr) minmax(220px, 300px) 18px;
-  color: inherit; text-decoration: none;
-}
-.benefit-row-link:focus-visible { outline: 2px solid var(--blue-ink); outline-offset: -4px; border-radius: var(--r-lg); }
-.br-main { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
-.br-title { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; }
-.br-title h3 { font-size: 16px; font-weight: 800; line-height: 1.35; margin-right: 2px; }
-.br-title .tag { padding: 2px 8px; font-size: 11px; }
-.br-main p { font-size: 13px; line-height: 1.55; color: #45586A; }
-.clamp-1 { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
-.br-meta { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 4px 10px; margin: 0; font-size: 12px; }
-.br-meta dt { font-weight: 700; color: var(--muted); }
-.br-meta dd { margin: 0; line-height: 1.45; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.br-chev { color: var(--muted); }
-.benefit-row:hover .br-chev { color: var(--blue-ink); }
-@media (max-width: 1000px) {
-  .benefit-row-link { grid-template-columns: 40px minmax(0, 1fr) 18px; }
-  .br-meta { grid-column: 2 / 3; grid-row: 2; }
-}
-@media (max-width: 640px) {
-  .benefit-row { flex-direction: column; }
-  .benefit-row-link { gap: 10px 12px; padding: 14px 16px; }
-}
+.bc-meta dt { font-weight: 700; color: var(--muted); }
+.bc-meta dd { margin: 0; line-height: 1.45; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bc-more { display: inline-flex; align-items: center; gap: 2px; align-self: flex-end; font-size: 12px; font-weight: 700; color: var(--muted); }
+.benefit-card:hover .bc-more { color: var(--blue-ink); }
 
 .results-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin: 4px 0 14px; font-size: 14px; color: var(--muted); }
 .results-bar p { margin: 0; }

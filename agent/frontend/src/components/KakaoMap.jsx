@@ -8,9 +8,9 @@ import MapPin from './MapPin.jsx'
  * center·level이 바뀌면 그 위치로 지도를 옮긴다. 멀리 있는 마커까지 다 보이게 줌아웃하지 않는다.
  */
 // 클러스터 묶음 모양 (카카오 클러스터러는 인라인 스타일만 받는다).
-// 개수가 많을수록 크게, 색은 초록(50개 미만) → 노랑(50~99) → 주황(100개 이상). 경계는 CLUSTER_STEPS
+// 개수가 많을수록 크게, 색은 초록(30개 미만) → 노랑(30~49) → 주황(50개 이상). 경계는 CLUSTER_STEPS
 // (빨강은 '위험'처럼 보여서 주황으로)
-const CLUSTER_STEPS = [50, 100]
+const CLUSTER_STEPS = [30, 50]
 const CLUSTER_TIERS = [
   { size: 40, bg: 'rgba(90, 164, 140, 0.92)', color: '#fff', shadow: 'rgba(30, 90, 70, 0.3)' }, // 초록 (보듬 초록)
   { size: 48, bg: 'rgba(242, 182, 48, 0.95)', color: '#4A3400', shadow: 'rgba(140, 100, 10, 0.3)' }, // 노랑: 흰 글씨가 안 보여서 진한 글씨
