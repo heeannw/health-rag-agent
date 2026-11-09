@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
-  ArrowLeft, ArrowRight, ChevronDown, ChevronUp, ExternalLink, Gift, Info, ListChecks, MapPin, MessageCircleHeart,
+  ArrowLeft, ArrowRight, ChevronDown, ChevronUp, Gift, Info, ListChecks, MapPin, MessageCircleHeart,
   Navigation, Phone,
 } from 'lucide-react'
 import KakaoMap from '../components/KakaoMap.jsx'
@@ -35,8 +35,11 @@ async function loadKakaoPlace(id, passed) {
 // 기관 지역에서 받을 수 있는 혜택 중 이 기관 유형과 관련된 것만 (관계없는 혜택으로 채우지 않는다)
 // related_facility_types는 백엔드가 혜택 이름·요약·신청방법 키워드로 추정한 값
 // (기관-혜택 직접 매핑은 가은 데이터 확정 후 교체)
+// 약국은 연계 혜택을 보여주지 않는다
+const NO_BENEFIT_TYPES = ['pharmacy']
+
 async function linkedBenefits(f) {
-  if (!f.province) return []
+  if (!f.province || NO_BENEFIT_TYPES.includes(f.type)) return []
   const { matched, needs_review } = await getBenefits({ province: f.province, municipality: f.municipality })
   return [...matched, ...needs_review]
     .filter((b) => b.related_facility_types?.includes(f.type) || b.related_facility_type === f.type)
@@ -89,6 +92,7 @@ export default function FacilityDetailPage() {
 
   const meta = FACILITY_META[facility.type]
   const hasServices = facility.services.length > 0
+  const showBenefits = !NO_BENEFIT_TYPES.includes(facility.type)
   const Icon = meta?.icon
   const directions = facility.lat
     ? `https://map.kakao.com/link/to/${encodeURIComponent(facility.name)},${facility.lat},${facility.lng}`
@@ -98,28 +102,20 @@ export default function FacilityDetailPage() {
     <section className="page page-full">
       <Link to="/map" className="back"><ArrowLeft size={18} />지도로</Link>
 
-      <div className="detail-hero glass">
-        <span className={`icon-tile lg ${meta?.tone}`}>{Icon && <Icon size={28} strokeWidth={1.6} />}</span>
-        <div className="detail-hero-text">
-          <span className="eyebrow">{meta?.label}{kakao && facility.summary && facility.summary !== meta?.label ? ` · ${facility.summary}` : ''}</span>
-          <h1>{facility.name}</h1>
-          <p>
-            {facility.address}
-            {facility.distance_km != null && <> · 내 지역에서 {facility.distance_km}km</>}
-          </p>
-        </div>
+      {/* 기관명·버튼·정보(왼쪽)와 지도(오른쪽)를 카드 하나로 */}
+      <div className="detail-card glass">
+        <div className="detail-main">
+          <div className="detail-hero">
+            <span className={`icon-tile lg ${meta?.tone}`}>{Icon && <Icon size={28} strokeWidth={1.6} />}</span>
+            <div className="detail-hero-text">
+              <h1>{facility.name}</h1>
+              {facility.distance_km != null && <p>내 지역에서 {facility.distance_km}km</p>}
+            </div>
+          </div>
         <div className="detail-actions">
           {directions && (
-            <a className="btn primary" href={directions} target="_blank" rel="noreferrer">
-              <Navigation size={16} />길찾기
-            </a>
-          )}
-          {facility.phone
-            ? <a className="btn" href={`tel:${facility.phone}`}><Phone size={16} />{facility.phone}</a>
-            : <span className="btn disabled"><Phone size={16} />전화번호 없음</span>}
-          {facility.place_url && (
-            <a className="btn" href={facility.place_url} target="_blank" rel="noreferrer">
-              <ExternalLink size={16} />카카오맵에서 보기
+            <a className="btn kakao" href={directions} target="_blank" rel="noreferrer">
+              <Navigation size={16} />카카오맵에서 길찾기
             </a>
           )}
           <button
@@ -130,6 +126,26 @@ export default function FacilityDetailPage() {
             <MessageCircleHeart size={16} />챗봇에 물어보기
           </button>
         </div>
+        <ul className="info-list">
+          <li><MapPin size={18} strokeWidth={1.8} /><span>주소</span><strong>{facility.address ?? '-'}</strong></li>
+          <li><Phone size={18} strokeWidth={1.8} /><span>전화</span><strong>{facility.phone ?? '-'}</strong></li>
+          {Object.entries(facility.details).map(([k, v]) => (
+            <li key={k}><Info size={18} strokeWidth={1.8} /><span>{k}</span><strong>{String(v)}</strong></li>
+          ))}
+          {facility.grades.length > 0 && (
+            <li>
+              <Info size={18} strokeWidth={1.8} /><span>평가등급</span>
+              <strong className="grades">
+                {facility.grades.map((g) => <span key={g} className="tag blue">{g}</span>)}
+                <small className="grade-hint">건강보험심사평가원 적정성 평가 · 1등급이 가장 우수</small>
+              </strong>
+            </li>
+          )}
+        </ul>
+        </div>
+        <div className="detail-map">
+          <KakaoMap markers={markers} center={facility} />
+        </div>
       </div>
 
       {kakao && (
@@ -137,7 +153,7 @@ export default function FacilityDetailPage() {
           <Info size={16} strokeWidth={1.8} />
           <span>
             카카오 장소 검색으로 찾은 기관이라 공공데이터의 인력·이용현황·제공 서비스 정보는 없어요.
-            운영시간과 진료과목은 <strong>카카오맵에서 보기</strong>로 확인해 주세요.
+            운영시간과 진료과목은 카카오맵에서 확인해 주세요.
           </span>
         </div>
       )}
@@ -159,30 +175,9 @@ export default function FacilityDetailPage() {
         </div>
       )}
 
-      <div className="detail-grid">
-        <ul className="info-list glass">
-          <li><MapPin size={18} strokeWidth={1.8} /><span>주소</span><strong>{facility.address ?? '-'}</strong></li>
-          <li><Phone size={18} strokeWidth={1.8} /><span>전화</span><strong>{facility.phone ?? '-'}</strong></li>
-          {Object.entries(facility.details).map(([k, v]) => (
-            <li key={k}><Info size={18} strokeWidth={1.8} /><span>{k}</span><strong>{String(v)}</strong></li>
-          ))}
-          {facility.grades.length > 0 && (
-            <li>
-              <Info size={18} strokeWidth={1.8} /><span>평가등급</span>
-              <strong className="grades">
-                {facility.grades.map((g) => <span key={g} className="tag blue">{g}</span>)}
-                <small className="grade-hint">건강보험심사평가원 적정성 평가 · 1등급이 가장 우수</small>
-              </strong>
-            </li>
-          )}
-        </ul>
-        <div className="detail-map glass">
-          <KakaoMap markers={markers} center={facility} />
-        </div>
-      </div>
-
       {/* 제공 서비스는 데이터가 있는 기관에서만 보여주고, 없으면 연계 혜택이 한 줄을 다 쓴다 */}
-      <div className={`detail-columns ${hasServices ? '' : 'single'}`}>
+      {(hasServices || showBenefits) && (
+      <div className={`detail-columns ${hasServices && showBenefits ? '' : 'single'}`}>
         {hasServices && (
           <div>
             <h2 className="section-title"><ListChecks size={20} strokeWidth={1.8} />제공 서비스</h2>
@@ -193,6 +188,7 @@ export default function FacilityDetailPage() {
             </ul>
           </div>
         )}
+        {showBenefits && (
         <div>
           <h2 className="section-title">
             <Gift size={20} strokeWidth={1.8} />이 기관과 연계된 혜택
@@ -230,7 +226,9 @@ export default function FacilityDetailPage() {
             </>
           )}
         </div>
+        )}
       </div>
+      )}
 
       {facility.data_source && <p className="data-source">출처: {facility.data_source}</p>}
     </section>

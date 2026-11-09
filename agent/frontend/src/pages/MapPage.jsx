@@ -47,7 +47,8 @@ export default function MapPage() {
   }, [locate, resetToDefault])
   const [params] = useSearchParams()
   // 혜택 카드의 "가까운 ○○ 보기"로 들어오면 그 유형만 켜진 상태로 시작
-  const [types, setTypes] = useState(() => (params.get('types') ? params.get('types').split(',') : []))
+  // (지도에 없는 유형, 예: 예전 링크의 dementia_center는 버린다)
+  const [types, setTypes] = useState(() => (params.get('types') ?? '').split(',').filter((t) => t in FACILITY_META))
   const [query, setQuery] = useState('')
   const [items, setItems] = useState([])
   const [error, setError] = useState(null)
@@ -73,7 +74,8 @@ export default function MapPage() {
       const placeTypes = types.length ? types : Object.keys(FACILITY_META)
       try {
         const [api, ...placeLists] = await Promise.all([
-          getFacilities({ types, q, ...center, ...scope, limit: MAX_FACILITIES }),
+          // 전체 보기일 때도 유형을 명시해서, 백엔드 데이터에 있는 치매안심센터가 지도에 섞이지 않게
+          getFacilities({ types: placeTypes, q, ...center, ...scope, limit: MAX_FACILITIES }),
           // 카카오 키가 없거나 검색이 막혀도 공공데이터 목록은 보여준다
           ...placeTypes.map((t) => searchNearbyPlaces(t, center).catch(() => [])),
         ])
@@ -189,9 +191,6 @@ export default function MapPage() {
                         <strong title={f.name}>{f.name}</strong>
                         {f.distance_km != null && <span className="distance">{f.distance_km}km</span>}
                       </span>
-                      <small>
-                        <b className={meta?.tone}>{meta?.label}</b>{f.summary ? ` · ${f.summary}` : ''}
-                      </small>
                       {f.grades.length > 0 && (
                         <span className="grades" title={f.grades.join(', ')}>
                           <span className="tag blue">{bestGrade(f.grades)}</span>
@@ -211,7 +210,7 @@ export default function MapPage() {
             )}
           </ul>
           <p className="data-source map-source">
-            출처: 전국치매센터표준데이터 · 건강보험심사평가원 병원평가정보 · 국민건강보험공단 장기요양기관 · 카카오 장소 검색
+            출처: 건강보험심사평가원 병원평가정보 · 국민건강보험공단 장기요양기관 · 카카오 장소 검색
           </p>
         </aside>
       </div>

@@ -6,7 +6,7 @@ import {
 import { getBenefits } from '../api.js'
 import { useRegion } from '../regionContext.js'
 import {
-  LIFE_CYCLES, REVIEW_LABELS, STATUS, THEMES, audienceOf, benefitPath, hasRegion, iconFor, periodOf, toneFor,
+  LIFE_CYCLES, REVIEW_LABELS, STATUS, THEMES, benefitPath, hasRegion, iconFor, periodOf, toneFor,
 } from '../benefitMeta.js'
 
 // 검색은 이미 받아온 혜택 안에서 한다. 띄어쓰기는 무시하고, 여러 단어는 모두 들어간 것만(AND)
@@ -95,7 +95,6 @@ export default function BenefitsPage() {
   return (
     <section className="page page-wide">
       <header className="page-head">
-        <span className="eyebrow">혜택 추천</span>
         <h1>{regionLabel ? `${shortLabel} · ${lifeCycleTitle(lifeCycles)}` : '나에게 맞는 의료·복지 혜택'}</h1>
         <p>{regionLabel} 주민이 받을 수 있는 혜택을 모았어요. 지역은 왼쪽 메뉴에서 바꿀 수 있어요.</p>
       </header>
@@ -178,8 +177,8 @@ export default function BenefitsPage() {
         </div>
       )}
 
-      <ul className="benefit-list">
-        {pageItems.map((b) => <BenefitRow key={b.id} b={b} region={region} />)}
+      <ul className="benefit-grid">
+        {pageItems.map((b) => <BenefitCard key={b.id} b={b} region={region} />)}
       </ul>
       {data && results.length === 0 && !error && (
         <p className="empty">
@@ -197,6 +196,8 @@ export default function BenefitsPage() {
 }
 
 const PAGE_SIZES = [10, 50, 100]
+// search_benefits가 분류가 비어 있을 때 넣는 표시 문구 (UNKNOWN_LABEL)
+const UNKNOWN_AUDIENCE = '대상 원문 확인'
 
 /** 제목에 쓸 연령 이름. 화면 표기(label)로, LIFE_CYCLES 순서대로 '영유아, 아동' 처럼 잇는다 */
 function lifeCycleTitle(selected) {
@@ -239,32 +240,41 @@ function Pagination({ page, pageCount, onChange }) {
   )
 }
 
-// 한 줄에 하나씩: 이름·구분·요약 한 줄 | 대상·지역·기간.
-// 선정기준·신청방법 같은 긴 원문은 상세 페이지에서 보여준다
-function BenefitRow({ b, region }) {
+// 카드 한 장: 아이콘·구분 태그 | 이름(2줄) | 요약(3줄) | 대상·지역·기간.
+// 넓은 화면에선 한 줄에 5장이라 기본 10개씩이면 2줄이 된다. 긴 원문은 상세 페이지에서 보여준다
+function BenefitCard({ b, region }) {
   const Icon = iconFor(b)
-  const status = STATUS[b.application_status] ?? STATUS.unknown
+  // 카드에선 신청 기간을 알 때만 상태 태그를 단다 ('기간 확인'은 빼고, 자세한 건 상세 페이지에서)
+  const status = b.application_status !== 'unknown' ? STATUS[b.application_status] : null
   const period = periodOf(b)
+  // '지역 확인'도 카드에선 뺀다. 지역을 모르는 혜택은 아래 '지역' 줄이 이미 빠져 있다
+  const reviews = b.review_fields.filter((f) => f !== 'region')
+  // '대상 원문 확인'(분류가 비어 있음)은 카드에서 빼고, 아는 대상만 보여 준다. 둘 다 모르면 '대상' 줄을 뺀다
+  const audience = [b.display.life_cycle, b.display.target_group].filter((t) => t && t !== UNKNOWN_AUDIENCE).join(' · ')
   return (
-    <li className="benefit-row glass">
-      <Link className="benefit-row-link" to={benefitPath(b, region)} state={{ benefit: b }}>
-        <span className={`icon-tile ${toneFor(b)}`}><Icon size={20} strokeWidth={1.8} /></span>
-        <div className="br-main">
-          <div className="br-title">
-            <h3>{b.name}</h3>
+    <li className="benefit-card glass">
+      <Link className="bc-link" to={benefitPath(b, region)} state={{ benefit: b }}>
+        <div className="bc-top">
+          <span className={`icon-tile ${toneFor(b)}`}><Icon size={20} strokeWidth={1.8} /></span>
+          <div className="bc-tags">
             <span className={`tag ${b.source === 'central' ? 'blue' : 'pink'}`}>{b.source === 'central' ? '중앙부처' : '지자체'}</span>
-            <span className={`tag ${status.tone}`}>{status.label}</span>
-            {b.review_fields.map((f) => <span key={f} className="tag gray">{REVIEW_LABELS[f] ?? f} 확인</span>)}
+            {status && <span className={`tag ${status.tone}`}>{status.label}</span>}
           </div>
-          {b.summary_text && <p className="clamp-1" title={b.summary_text}>{b.summary_text}</p>}
         </div>
-        <dl className="br-meta">
-          <dt>대상</dt><dd title={audienceOf(b)}>{audienceOf(b)}</dd>
+        <h3 className="clamp-2" title={b.name}>{b.name}</h3>
+        {b.summary_text && <p className="clamp-3" title={b.summary_text}>{b.summary_text}</p>}
+        {reviews.length > 0 && (
+          <div className="bc-tags">
+            {reviews.map((f) => <span key={f} className="tag gray">{REVIEW_LABELS[f] ?? f} 확인</span>)}
+          </div>
+        )}
+        <dl className="bc-meta">
+          {audience && <><dt>대상</dt><dd title={audience}>{audience}</dd></>}
           {/* 제공 지역 정보가 없는 혜택('대상 원문 확인')은 위치 표시를 뺀다 */}
-          {hasRegion(b) && <><dt>지역</dt><dd>{b.display.region}</dd></>}
-          {period && <><dt>기간</dt><dd>{period}</dd></>}
+          {hasRegion(b) && <><dt>지역</dt><dd title={b.display.region}>{b.display.region}</dd></>}
+          {period && <><dt>기간</dt><dd title={period}>{period}</dd></>}
         </dl>
-        <ChevronRight size={18} className="br-chev" />
+        <span className="bc-more">자세히 보기<ChevronRight size={15} /></span>
       </Link>
     </li>
   )

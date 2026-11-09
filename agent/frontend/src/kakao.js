@@ -32,7 +32,7 @@ export async function regionFromCoords(lat, lng) {
   })
 }
 
-// 지도 기관 유형 → 카카오 장소 검색 방법. 병원은 카테고리(HP8), 나머지는 키워드.
+// 지도 기관 유형 → 카카오 장소 검색 방법. 병원(HP8)·약국(PM9)은 카테고리, 나머지는 키워드.
 // keep: 키워드 검색에 섞여 나오는 엉뚱한 장소(예: '○○보건소 개방화장실')를 걸러낸다.
 const PLACE_QUERIES = {
   hospital: { category: 'HP8', radius: 3000 },
@@ -40,8 +40,37 @@ const PLACE_QUERIES = {
     keyword: '보건소', radius: 10000,
     keep: (p) => /보건(소|지소|진료소)$/.test(p.category_name.split(' > ').at(-1)),
   },
-  dementia_center: { keyword: '치매안심센터', radius: 10000, keep: (p) => p.place_name.includes('치매') },
+  pharmacy: { category: 'PM9', radius: 3000 },
   ltc_institution: { keyword: '요양원', radius: 5000, keep: (p) => /요양|노인/.test(p.category_name) },
+}
+
+// 카카오맵엔 큰 병원이 과마다 따로 등록돼 있어서('한양대학교병원 정형외과', '… 외과' …) 그대로 쓰면
+// 같은 병원이 핀 여러 개로 나온다. 이름이 'OO병원 …'이고 가까이(500m 안) 있는 장소는 'OO병원' 하나로 합친다.
+// 본원 장소가 결과에 있으면 그걸 남기고, 없으면 가장 가까운 과 장소를 본원 이름으로 바꿔 남긴다.
+const MERGE_RADIUS_M = 500
+function mergeDepartments(places) {
+  const baseOf = (p) => {
+    const [first, ...rest] = p.place_name.trim().split(/\s+/)
+    return rest.length && /병원$/.test(first) ? first : p.place_name.trim()
+  }
+  const near = (a, b) => {
+    const dLat = (Number(a.y) - Number(b.y)) * 111000
+    const dLng = (Number(a.x) - Number(b.x)) * 88000 // 위도 37° 근처 경도 1°≈88km
+    return Math.hypot(dLat, dLng) <= MERGE_RADIUS_M
+  }
+  const groups = [] // { base, items }
+  for (const p of places) {
+    const base = baseOf(p)
+    const g = groups.find((g) => g.base === base && near(g.items[0], p))
+    if (g) g.items.push(p)
+    else groups.push({ base, items: [p] })
+  }
+  return groups.map(({ base, items }) => {
+    if (items.length === 1) return items[0]
+    const main = items.find((p) => p.place_name.trim() === base)
+    // 결과는 거리순이라 items[0]이 가장 가깝다
+    return main ?? { ...items[0], place_name: base, category_name: '의료,건강 > 병원' }
+  })
 }
 
 /** 기준점 주변 실제 기관을 카카오 장소 검색으로 찾아 /api/facilities와 같은 모양으로 돌려준다. */
@@ -55,7 +84,7 @@ export async function searchNearbyPlaces(type, { lat, lng }) {
     if (category) places.categorySearch(category, done, options)
     else places.keywordSearch(keyword, done, options)
   })
-  return data.filter(keep).map((p) => ({
+  return mergeDepartments(data.filter(keep)).map((p) => ({
     id: `kakao-${p.id}`,
     type,
     name: p.place_name,
