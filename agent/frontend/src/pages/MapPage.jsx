@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ChevronRight, LoaderCircle, LocateFixed, MapPin, RotateCw, Search } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { ChevronRight, Clock, LoaderCircle, LocateFixed, MapPin, Phone, RotateCw, Search } from 'lucide-react'
 import KakaoMap from '../components/KakaoMap.jsx'
 import { getFacilities } from '../api.js'
 import { FACILITY_META } from '../facilityTypes.js'
@@ -10,14 +10,14 @@ import { useRegion } from '../regionContext.js'
 
 const squash = (name) => name.replace(/\s/g, '')
 
-/** 병원 평가등급이 많게는 10개 넘게 와서, 목록에는 가장 좋은 등급 하나와 나머지 개수만 보여준다 */
+// 목록 주소는 시도·시군구를 뺀다 ('서울특별시 중구 무교로 12' → '무교로 12')
+const shortAddress = (addr) => addr.replace(/^\S+\s+(?:\S+[시군구]\s+){0,2}/, '') || addr
+
+/** 목록엔 가장 좋은 평가등급 하나만 */
 const gradeNo = (g) => Number(g.match(/(\d+)\s*등급/)?.[1] ?? 99)
 const bestGrade = (grades) => [...grades].sort((a, b) => gradeNo(a) - gradeNo(b))[0]
 
-/**
- * 공공데이터 기관(/api/facilities)과 카카오 장소 검색 결과를 합친다.
- * 같은 기관(이름 같고 300m 이내)은 상세정보가 있는 공공데이터를 남긴다.
- */
+/** 공공데이터와 카카오 결과를 합친다 (같은 기관이면 공공데이터를 남김) */
 function mergeFacilities(api, places) {
   const dup = (p) => api.some((f) => squash(f.name) === squash(p.name)
     && f.lat && Math.hypot(f.lat - p.lat, (f.lng - p.lng) * 0.8) < 0.003)
@@ -25,47 +25,42 @@ function mergeFacilities(api, places) {
     .sort((a, b) => (a.distance_km ?? Infinity) - (b.distance_km ?? Infinity))
 }
 
-// 시군구(현재 위치 포함)는 기준점 반경 안만, 시도 전체는 그 시도 기관만 보여준다
+// 시군구는 반경 안, 시도 전체는 그 시도 기관
 const NEARBY_KM = 5
-// 서울 전체만 해도 기관이 1만 곳이 넘어서, 지도·목록에는 가까운 순으로 이만큼만 올린다
+// 가까운 순으로 이만큼만
 const MAX_FACILITIES = 200
 const scopeParams = (region) => (region.municipality ? { radius_km: NEARBY_KM } : { province: region.province })
-// 지도를 이만큼(km) 넘게 옮기면 "이 지역 검색" 버튼을 띄운다
+// 이만큼(km) 옮기면 "이 지역 검색" 버튼
 const MOVED_KM = 0.3
-// 목록은 처음에 이만큼만 그리고, 끝까지 스크롤하면 이만큼씩 더 붙인다 (지도 핀은 전부 그대로)
+// 목록 무한 스크롤 단위
 const LIST_PAGE = 15
 const kmBetween = (a, b) => Math.hypot((a.lat - b.lat) * 111, (a.lng - b.lng) * 88)
 
 export default function MapPage() {
-  const { region, shortLabel, locate, locating, locateError, resetToDefault } = useRegion()
-  // 들어올 때마다 현재 위치를 다시 잡고, 실패하면 서울특별시 전체로 시작한다
-  const [ready, setReady] = useState(false)
-  useEffect(() => {
-    locate()
-      .then((ok) => ok || resetToDefault())
-      .finally(() => setReady(true))
-  }, [locate, resetToDefault])
-  const [params] = useSearchParams()
-  // 혜택 카드의 "가까운 ○○ 보기"로 들어오면 그 유형만 켜진 상태로 시작
-  // (지도에 없는 유형, 예: 예전 링크의 dementia_center는 버린다)
-  const [types, setTypes] = useState(() => (params.get('types') ?? '').split(',').filter((t) => t in FACILITY_META))
+  // 지도는 '내 지역' 기준. '내 위치로'는 내 지역 자체를 바꾼다
+  const { region, shortLabel, locate, locating, locateError } = useRegion()
+
+  const [types, setTypes] = useState([])
   const [query, setQuery] = useState('')
   const [items, setItems] = useState([])
   const [error, setError] = useState(null)
   const navigate = useNavigate()
 
-  // 지도를 옮긴 뒤 다시 검색하면 그 지도 중심(area) 반경에서 찾는다. 지역을 바꾸면 다시 지역 기준으로
+  // "이 지역 검색"을 누르면 지도 중심(area) 기준, 지역을 바꾸면 초기화
   const [area, setArea] = useState(null)
   const [mapCenter, setMapCenter] = useState(null)
-  useEffect(() => setArea(null), [region])
-  const searchBase = area ?? (region ? { lat: region.lat, lng: region.lng } : null)
+  // 지도 중심도 비워서, 새 지역으로 옮겨 가는 동안 버튼이 깜빡이지 않게
+  useEffect(() => {
+    setArea(null)
+    setMapCenter(null)
+  }, [region])
+  const searchBase = area ?? { lat: region.lat, lng: region.lng }
   const moved = !!(mapCenter && searchBase && kmBetween(mapCenter, searchBase) > MOVED_KM)
   const searchHere = () => mapCenter && setArea(mapCenter)
-  // 검색어·유형을 바꿀 때도 지도를 옮겨 둔 상태면 지금 보고 있는 곳에서 찾는다
+  // 지도를 옮겨 둔 상태면 검색어·유형 변경도 지금 보는 곳에서
   const followMap = () => moved && searchHere()
 
   useEffect(() => {
-    if (!region || !ready) return
     let cancelled = false
     const timer = setTimeout(async () => {
       const q = query.trim()
@@ -74,9 +69,9 @@ export default function MapPage() {
       const placeTypes = types.length ? types : Object.keys(FACILITY_META)
       try {
         const [api, ...placeLists] = await Promise.all([
-          // 전체 보기일 때도 유형을 명시해서, 백엔드 데이터에 있는 치매안심센터가 지도에 섞이지 않게
+          // 유형을 명시해 치매안심센터를 뺀다
           getFacilities({ types: placeTypes, q, ...center, ...scope, limit: MAX_FACILITIES }),
-          // 카카오 키가 없거나 검색이 막혀도 공공데이터 목록은 보여준다
+          // 카카오가 실패해도 공공데이터는 보여준다
           ...placeTypes.map((t) => searchNearbyPlaces(t, center).catch(() => [])),
         ])
         const places = placeLists.flat().filter((p) => !q || p.name.includes(q) || p.summary.includes(q))
@@ -92,9 +87,9 @@ export default function MapPage() {
       cancelled = true
       clearTimeout(timer)
     }
-  }, [region, ready, types, query, area])
+  }, [region, types, query, area])
 
-  // 목록 더 보기: 검색 결과가 바뀌면 다시 15개부터, 바닥 가까이 스크롤하면 15개 더
+  // 결과가 바뀌면 처음부터
   const [listCount, setListCount] = useState(LIST_PAGE)
   const listRef = useRef(null)
   useEffect(() => {
@@ -102,7 +97,7 @@ export default function MapPage() {
     listRef.current?.scrollTo({ top: 0 })
   }, [items])
   const hasMore = listCount < items.length
-  // 바닥에서 120px 안쪽이면 미리 붙인다. 목록이 패널보다 짧아 스크롤이 안 생기는 큰 화면도 같은 조건으로 채운다
+  // 바닥 120px 안이면 더 붙인다 (스크롤이 없는 큰 화면도)
   const loadMoreIfNearEnd = useCallback(() => {
     const ul = listRef.current
     if (ul && hasMore && ul.scrollTop + ul.clientHeight >= ul.scrollHeight - 120) {
@@ -115,15 +110,17 @@ export default function MapPage() {
     followMap()
     setTypes((t) => (t.includes(key) ? t.filter((k) => k !== key) : [...t, key]))
   }
-  // 카카오 장소도 같은 기관 상세 화면으로 연다. 백엔드에 없는 장소라 데이터를 같이 넘겨 둔다
+  // 카카오 장소는 데이터를 같이 넘긴다
   const open = useCallback((f) => {
     if (isKakaoPlace(f.id)) savePlace(f)
-    navigate(`/facilities/${f.id}`, { state: isKakaoPlace(f.id) ? { facility: f } : undefined })
+    navigate(`/facilities/${encodeURIComponent(f.id)}`, { state: isKakaoPlace(f.id) ? { facility: f } : undefined })
   }, [navigate])
-  const center = useMemo(() => (region ? { lat: region.lat, lng: region.lng } : undefined), [region])
-  // 지역을 직접 고른 경우엔 그 좌표가 내 위치가 아니라서, GPS로 잡은 때만 점을 찍는다
-  const myLocation = region?.fromGps ? center : undefined
-  // "내 위치로": 위치를 다시 잡고, 좌표가 그대로여도 지도를 그 자리로 되돌린다
+  const center = useMemo(() => ({ lat: region.lat, lng: region.lng }), [region])
+  // GPS로 잡은 지역일 때만 내 위치 점
+  const myLocation = region.fromGps ? center : undefined
+  // 내 위치가 있으면 거기서 잰 거리
+  const distanceOf = (f) => (myLocation && f.lat ? Math.round(kmBetween(myLocation, f) * 10) / 10 : f.distance_km)
+  // 좌표가 같아도 지도를 되돌린다
   const [recenterKey, setRecenterKey] = useState(0)
   const goToMyLocation = async () => {
     if (await locate()) setRecenterKey((k) => k + 1)
@@ -132,8 +129,8 @@ export default function MapPage() {
   return (
     <section className="map-page">
       <div className="map-stage">
-        <KakaoMap markers={items} onSelect={open} center={center} level={region?.municipality ? 6 : 8} myLocation={myLocation} recenterKey={recenterKey} onCenterChange={setMapCenter} />
-        {moved && ready && (
+        <KakaoMap markers={items} onSelect={open} center={center} level={region.municipality ? 6 : 8} myLocation={myLocation} recenterKey={recenterKey} onCenterChange={setMapCenter} />
+        {moved && (
           <button type="button" className="map-search-here glass" onClick={searchHere}>
             <RotateCw size={15} strokeWidth={2} />이 지역 검색
           </button>
@@ -161,7 +158,6 @@ export default function MapPage() {
             <Search size={16} strokeWidth={1.8} />
             <input value={query} onChange={(e) => { followMap(); setQuery(e.target.value) }} placeholder="기관명, 진료과목 검색" />
           </label>
-          {/* 4개 유형을 2×2로 같은 폭에 맞춰서 줄이 들쭉날쭉하지 않게 */}
           <div className="type-toggles">
             {Object.entries(FACILITY_META).map(([key, { label, icon: Icon, tone }]) => (
               <button
@@ -174,8 +170,7 @@ export default function MapPage() {
               </button>
             ))}
           </div>
-          {/* 개수 표시는 뺐다. 위치를 잡는 동안만 안내 */}
-          {!ready && <p className="result-count">현재 위치를 찾는 중…</p>}
+          {locating && <p className="result-count">현재 위치를 찾는 중…</p>}
           {error && <p className="error">{error}</p>}
           <ul ref={listRef} onScroll={loadMoreIfNearEnd}>
             {items.slice(0, listCount).map((f) => {
@@ -186,11 +181,19 @@ export default function MapPage() {
                   <button onClick={() => open(f)}>
                     <span className={`icon-tile ${meta?.tone}`}>{Icon && <Icon size={18} strokeWidth={1.8} />}</span>
                     <span className="facility-text">
-                      {/* 이름은 한 줄, 거리는 이름 오른쪽 끝에 붙여서 눈이 한 줄로 읽게 */}
                       <span className="facility-name">
                         <strong title={f.name}>{f.name}</strong>
-                        {f.distance_km != null && <span className="distance">{f.distance_km}km</span>}
+                        {distanceOf(f) != null && <span className="distance">{distanceOf(f)}km</span>}
                       </span>
+                      {f.address && (
+                        <span className="facility-meta" title={f.address}><MapPin size={13} strokeWidth={1.8} /><span>{shortAddress(f.address)}</span></span>
+                      )}
+                      {f.details?.운영시간 && (
+                        <span className="facility-meta"><Clock size={13} strokeWidth={1.8} /><span>{f.details.운영시간}</span></span>
+                      )}
+                      {f.phone && (
+                        <span className="facility-meta"><Phone size={13} strokeWidth={1.8} /><span>{f.phone}</span></span>
+                      )}
                       {f.grades.length > 0 && (
                         <span className="grades" title={f.grades.join(', ')}>
                           <span className="tag blue">{bestGrade(f.grades)}</span>

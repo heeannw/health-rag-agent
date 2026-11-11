@@ -132,7 +132,7 @@ def generate_answer(query: str, n_results: int = 5, history: list[dict] | None =
         ],
     )
 
-    answer = response.choices[0].message.content
+    answer = response.choices[0].message.content or ""
     return {
         "answer": answer,
         "sources": _format_sources(hits, answer),

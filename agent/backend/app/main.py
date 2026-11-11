@@ -1,8 +1,4 @@
-"""웹 4개 화면이 호출하는 FastAPI 서버.
-
-실행 (agent/backend 폴더에서):
-    uvicorn app.main:app --reload --port 8000
-"""
+"""보듬 웹 API 서버. 실행(agent/backend): uvicorn app.main:app --reload --port 8000"""
 
 import threading
 from contextlib import asynccontextmanager
@@ -20,7 +16,7 @@ from app.services.facilities import FACILITIES, REGIONS
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    # 모델 로딩(수십 초)이 서버 시작을 막지 않도록 백그라운드에서 미리 불러온다
+    # 모델 로딩(수십 초)은 백그라운드에서
     threading.Thread(target=rag.warm_up, daemon=True).start()
     yield
 
@@ -38,7 +34,7 @@ app.add_middleware(
 @app.exception_handler(rag.RagUnavailable)
 @app.exception_handler(benefit_search.BenefitsUnavailable)
 async def unavailable(_: Request, exc: Exception):
-    # 연결된 담당 모듈(RAG·혜택 DB)을 못 쓰면 503으로 사유를 알려준다
+    # RAG·혜택 DB를 못 쓰면 503 + 사유
     return JSONResponse(status_code=503, content={"detail": str(exc)})
 
 
@@ -60,12 +56,11 @@ def health():
 
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat(req: ChatRequest):
-    # 임베딩·LLM 호출이 동기 코드라 스레드풀에서 실행
+    # 동기 코드라 스레드풀에서
     history = [t.model_dump() for t in req.history]
     return await run_in_threadpool(rag.ask, req.query, req.n_results, req.region, history)
 
 
-# 지역은 data/regions.json, 혜택은 health_benefits 검색, 기관은 data/facilities.json.
 @app.get("/api/regions", response_model=list[Region])
 def regions():
     return REGIONS
@@ -81,7 +76,7 @@ async def benefits(
 ):
     if municipality and not province:
         raise HTTPException(400, "시군구를 선택하려면 시도를 함께 입력하세요.")
-    # 첫 호출은 DB 조회라 스레드풀에서 실행
+    # DB 조회가 있어 스레드풀에서
     return await run_in_threadpool(
         benefit_search.search,
         province, municipality, _split(life_cycle), _split(target_group), _split(themes),
@@ -110,6 +105,10 @@ def facilities(
     radius_km: float | None = Query(None, gt=0, description="기준점에서 이 거리 안의 기관만 (lat·lng 필요)"),
     limit: int | None = Query(None, ge=1, le=2000, description="가까운 순으로 이 개수까지만"),
 ):
+    if (lat is None) != (lng is None):
+        raise HTTPException(400, "lat와 lng는 함께 입력하세요.")
+    if radius_km is not None and lat is None:
+        raise HTTPException(400, "radius_km를 쓰려면 lat, lng를 함께 입력하세요.")
     result = FACILITIES
     if type_list := _split(types):
         result = [f for f in result if f["type"] in type_list]

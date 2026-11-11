@@ -1,10 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ChatHistoryContext } from './chatHistoryContext.js'
 
-/**
- * 챗봇 대화 기록. 로그인이 없어서 이 브라우저(localStorage)에만 저장한다.
- * 한 대화 = { id, title, createdAt, updatedAt, messages: [{ role, text, sources? }] }
- */
+/** 챗봇 대화 기록 (localStorage). 대화 = { id, title, createdAt, updatedAt, messages } */
 const STORAGE_KEY = 'health-agent:conversations:v1'
 const MAX_CONVERSATIONS = 100
 
@@ -21,7 +18,7 @@ function persist(list) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(list))
   } catch {
-    // 저장이 막힌 환경(시크릿 창 등)이면 이번 방문 동안만 유지
+    // 저장이 막히면 이번 방문 동안만 유지
   }
 }
 
@@ -47,7 +44,7 @@ export function ChatHistoryProvider({ children }) {
     return () => window.removeEventListener('storage', onStorage)
   }, [])
 
-  /** 대화를 새로 만들고 id를 돌려준다. 첫 질문이 제목이 된다. */
+  /** 새 대화를 만들고 id 반환 (첫 질문이 제목) */
   const create = useCallback((firstQuestion) => {
     const now = Date.now()
     const conv = { id: newId(), title: titleOf(firstQuestion), createdAt: now, updatedAt: now, messages: [] }
@@ -56,7 +53,7 @@ export function ChatHistoryProvider({ children }) {
     return conv.id
   }, [])
 
-  /** 해당 대화 끝에 메시지를 붙인다. 답변이 늦게 와도 보낸 대화에 들어간다. */
+  /** 대화 끝에 메시지 추가 (늦게 온 답변도 보낸 대화로) */
   const append = useCallback((id, message) => {
     setConversations((list) =>
       list.map((c) => (c.id === id ? { ...c, messages: [...c.messages, message], updatedAt: Date.now() } : c)),

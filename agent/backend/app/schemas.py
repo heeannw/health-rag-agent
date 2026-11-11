@@ -1,4 +1,4 @@
-"""화면 ↔ API 응답 스키마. 원희(챗봇)·가은(매칭) 담당과 협의할 계약서 역할."""
+"""API 요청·응답 스키마."""
 
 from typing import Literal
 
@@ -16,7 +16,7 @@ class ChatRequest(BaseModel):
     query: str = Field(..., min_length=1, examples=["65세 이상 받을 수 있는 의료 혜택"])
     n_results: int = Field(5, ge=1, le=20)
     region: str | None = Field(None, examples=["서울특별시 마포구"])  # 사용자가 고른 지역 (선택)
-    # 이전 대화 (오래된 것부터). 후속 질문("신청은 어떻게 해?")의 맥락을 잡는 데 쓴다
+    # 이전 대화(오래된 것부터), 후속 질문 맥락용
     history: list[ChatTurn] = Field(default_factory=list, max_length=40)
 
 
@@ -29,8 +29,7 @@ class Source(BaseModel):
 class ChatResponse(BaseModel):
     answer: str
     sources: list[Source]
-    # 서비스 범위 밖 질문이라 검색 없이 안내 문구로 답한 경우 그 사유
-    # off_topic | diagnosis | abusive | injection | gibberish | too_long | crisis
+    # 범위 밖 질문으로 막힌 사유: off_topic | diagnosis | abusive | injection | gibberish | too_long | crisis
     blocked: str | None = None
 
 
@@ -62,7 +61,7 @@ class Benefit(BaseModel):
     name: str
     summary_text: str | None = None
     target_text: str | None = None
-    criteria_text: str | None = None  # 소득 등 공식 선정기준 (사용자에게 묻지 않고 그대로 노출)
+    criteria_text: str | None = None  # 공식 선정기준 원문
     benefit_text: str | None = None
     source_url: str | None = None
     provider_province: str | None = None
@@ -73,14 +72,13 @@ class Benefit(BaseModel):
     application_status: str = "unknown"  # unknown | scheduled | open | closed
     application_start_date: str | None = None
     application_deadline: str | None = None
-    application_method: str | None = None  # 신청 방법·장소 (예: 주소지 관할 보건소 방문 신청)
+    application_method: str | None = None  # 신청 방법·장소
     application_forms: list[ApplicationForm] | None = None  # 신청 서식·안내 첨부파일 (복지로)
     legal_basis: list[str] | None = None   # 근거법령·조례 이름
-    related_facility_type: str | None = None  # 이 혜택을 받으러 가는 대표 기관 유형 (지도 연결용, 아직 DB 컬럼 없음)
-    related_facility_types: list[str] = []  # 키워드로 추정한 관련 기관 유형 전체 (기관 상세의 연계 혜택용)
+    related_facility_types: list[str] = []  # 키워드로 추정한 관련 기관 유형
     display: BenefitDisplay
     region_scope: str  # nationwide | regional | unknown
-    review_fields: list[str] = []  # 선택한 조건 중 원문 정보가 없어 확인이 필요한 항목
+    review_fields: list[str] = []  # 원문 확인이 필요한 조건
 
 
 class BenefitsResponse(BaseModel):

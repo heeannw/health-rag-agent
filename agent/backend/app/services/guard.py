@@ -1,16 +1,5 @@
-"""챗봇 질문 거르기. RAG 검색·답변 생성 전에 서비스 범위를 벗어난 질문을 막는다.
-
-보듬은 의료·복지 혜택, 제도·법령, 의료기관 '정보 안내' 서비스라서 아래는 답하지 않고 안내 문구를 돌려준다.
-- off_topic: 날씨·주식·코딩·연예·숙제처럼 의료·복지와 관계없는 질문
-- diagnosis: 증상으로 병을 판단하거나 약·복용량을 정해 달라는 질문 (진단·처방은 하지 않는다)
-- abusive:   욕설·혐오·불법 행위 요청
-- injection: 지시 무시, 시스템 프롬프트 공개 같은 프롬프트 조작
-- gibberish: 글자가 거의 없거나 의미 없는 입력
-- crisis:    자해·자살 언급 → 막지 않고 상담 전화를 먼저 안내한다
-
-1단계는 규칙(빠르고 확실한 것), 2단계는 LLM 분류. LLM 분류가 실패하면 질문을 통과시킨다
-(검색 결과에 없으면 답변 단계에서 어차피 '찾지 못했다'고 답한다).
-"""
+"""챗봇 질문 거르기: 1단계 규칙, 2단계 LLM 분류(실패하면 통과).
+범위 밖 질문은 안내 문구로, 자살·자해 언급(crisis)은 상담 전화 안내로 답한다."""
 
 import json
 import logging
@@ -61,8 +50,11 @@ MESSAGES = {
 
 # ── 1단계: 규칙 ───────────────────────────────────────
 
-_CRISIS = re.compile(r"자살|죽고\s*싶|극단적\s*선택|자해|목숨을\s*끊|살기\s*싫")
-_ABUSE = re.compile(r"씨발|시발|ㅅㅂ|ㅆㅂ|병신|ㅂㅅ|좆|개새끼|존나|fuck|shit", re.IGNORECASE)
+# '자살예방센터', '자살 유가족 지원'처럼 제도·기관을 묻는 말은 위기로 보지 않는다
+_CRISIS = re.compile(
+    r"자살(?!\s*(예방|방지|유가족|유족))|죽고\s*싶|극단적\s*선택|자해(?!\s*(예방|방지))|목숨을\s*끊|살기\s*싫"
+)
+_ABUSE = re.compile(r"씨발|시발(?!점|역)|ㅅㅂ|ㅆㅂ|병신|ㅂㅅ|좆|개새끼|존나|fuck|shit", re.IGNORECASE)
 _INJECTION = re.compile(
     r"(이전|위의|앞의|모든|기존).{0,10}(지시|명령|규칙|프롬프트).{0,10}(무시|잊어|따르지)"
     r"|시스템\s*프롬프트|system\s*prompt|ignore\s+(all|previous|the above)|jailbreak|탈옥"
@@ -71,12 +63,13 @@ _INJECTION = re.compile(
 )
 
 
-def _rule_check(query: str) -> str | None:
+def rule_check(query: str) -> str | None:
+    """규칙으로 막을 사유 코드. 모델 없이 돌아서 RAG 장애 때도 위기 안내가 나간다."""
     q = query.strip()
     if len(q) > MAX_QUERY_CHARS:
         return "too_long"
     letters = re.findall(r"[가-힣A-Za-z]", q)
-    # '?'만, 'ㅋㅋㅋㅋ', 'asdfasdf'처럼 의미 있는 글자가 거의 없는 입력
+    # '?', 'ㅋㅋㅋ', 'aaaaa'처럼 의미 없는 입력
     if len(letters) < 2 or re.fullmatch(r"[ㄱ-ㅎㅏ-ㅣ\s.!?~]+", q) or re.fullmatch(r"(.)\1{4,}", q):
         return "gibberish"
     if _CRISIS.search(q):
@@ -119,14 +112,13 @@ def _llm_check(client, model: str, query: str, history: list[dict]) -> str | Non
         )
         text = response.choices[0].message.content or ""
         label = json.loads(re.search(r"\{.*\}", text, re.S).group(0)).get("label")
-    except Exception:  # 분류 실패는 통과시킨다 (답변 단계에서 근거 없으면 못 찾았다고 답함)
+    except Exception:  # 분류 실패는 통과
         logger.warning("질문 분류 실패 — 통과시킴", exc_info=True)
         return None
     return label if label in _LABELS and label != "ok" else None
 
 
-# 분명히 서비스 범위인 질문은 LLM 분류를 건너뛴다 (Gemini 호출 수·사용량 한도 절약).
-# 단 증상·약 이야기가 섞이면 진단 요청일 수 있어서 LLM에 맡긴다
+# 분명한 범위 내 질문은 LLM 분류를 건너뛴다 (Gemini 한도 절약). 증상·약 이야기는 LLM에 맡긴다
 _DOMAIN = re.compile(
     r"혜택|복지|지원|급여|수당|바우처|신청|서류|자격|대상|보건소|병원|의원|치매|요양|돌봄|검진|예방접종"
     r"|임산부|임신|출산|난임|장애|노인|어르신|기초생활|의료비|진료비|건강보험|법령|제도|센터|기관"
@@ -134,12 +126,9 @@ _DOMAIN = re.compile(
 _MEDICAL_CUE = re.compile(r"증상|아프|아파|통증|열이|열나|약을|약은|몇\s*알|복용|처방|진단|무슨\s*병|어떤\s*병|치료법")
 
 
-def check(query: str, history: list[dict] | None = None, llm=None) -> str | None:
-    """막아야 하면 사유 코드, 아니면 None. llm=(client, model)이 있으면 LLM 분류까지 한다."""
-    reason = _rule_check(query)
-    if reason or not llm:
-        return reason
-    if _DOMAIN.search(query) and not _MEDICAL_CUE.search(query):
+def llm_check(query: str, history: list[dict] | None = None, llm=None) -> str | None:
+    """rule_check를 통과한 질문을 LLM으로 분류한다. llm=(client, model)이 없으면 통과."""
+    if not llm or (_DOMAIN.search(query) and not _MEDICAL_CUE.search(query)):
         return None
     return _llm_check(*llm, query, history or [])
 

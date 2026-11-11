@@ -1,4 +1,4 @@
-> 실행 예시는 저장소 루트 기준입니다. 파일별 새 위치와 실행 방법은 [README](../README.md)를 참고하세요.
+> 실행 예시는 저장소 루트 기준입니다. 파일별 새 위치와 실행 방법은 [README](../../README.md#혜택-db-health_benefits)를 참고하세요.
 
 # 단일 benefit 테이블
 

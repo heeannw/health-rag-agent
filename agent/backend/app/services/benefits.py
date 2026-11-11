@@ -1,9 +1,4 @@
-"""가은 담당 health_benefits의 의료 혜택 검색(search_benefits)을 호출한다.
-
-healty_benefit 테이블(770건 내외)을 통째로 읽어 메모리에 잠깐 캐시하고, 필터링은
-가은의 extract_benefits()에 맡긴다. DB 접속 정보는 저장소 루트 .env(PGHOST 등)를
-그대로 쓴다. 패키지를 못 불러오거나 DB를 못 읽으면 BenefitsUnavailable을 낸다.
-"""
+"""health_benefits의 혜택 검색 연결. healty_benefit을 캐시하고 필터링은 extract_benefits()에 맡긴다."""
 
 import logging
 import sys
@@ -47,21 +42,24 @@ def _rows() -> list[dict]:
     try:
         rows = _search.load_database()
     except Exception as e:  # psycopg 미설치, .env 없음, 접속 실패 등
+        if _cache:  # 예전 데이터가 있으면 그걸 계속 쓴다
+            logger.warning("healty_benefit 조회 실패 — 예전 캐시 사용", exc_info=True)
+            # 요청마다 접속을 기다리지 않게 1분 뒤에 다시 시도
+            _cache = (time.monotonic() - CACHE_SECONDS + 60, _cache[1])
+            return _cache[1]
         logger.exception("healty_benefit 조회 실패")
         raise BenefitsUnavailable(f"혜택 DB 조회 실패 ({type(e).__name__})") from e
     _cache = (time.monotonic(), rows)
     return rows
 
 
-# 기관-혜택 직접 매핑 컬럼이 아직 없어서, 혜택 이름·요약·신청방법 키워드로 받으러 가는 기관 유형을 추정한다.
-# 지도 기관 상세의 '연계된 혜택'과 혜택 카드의 '가까운 기관 보기'에 쓴다. (DB 컬럼이 생기면 교체)
+# 기관-혜택 매핑 컬럼이 없어 키워드로 관련 기관 유형을 추정 (기관 상세 '연계된 혜택'용)
 _CORE_KEYWORDS = {
-    "dementia_center": ("치매",),
     "ltc_institution": ("장기요양", "요양원", "요양시설", "방문요양", "노인요양"),
     "hospital": ("의료비", "진료비", "치료비", "수술비", "검사비", "입원", "의료기관", "병원"),
     "public_health_center": ("보건소", "검진", "예방접종"),
 }
-_METHOD_KEYWORDS = {"dementia_center": ("치매안심센터",), "public_health_center": ("보건소",)}
+_METHOD_KEYWORDS = {"public_health_center": ("보건소",)}
 
 
 def _facility_types(b: dict) -> list[str]:
@@ -74,16 +72,11 @@ def _facility_types(b: dict) -> list[str]:
 
 
 def _with_facilities(b: dict) -> dict:
-    types = _facility_types(b)
-    return {**b, "related_facility_types": types, "related_facility_type": b.get("related_facility_type") or (types[0] if types else None)}
+    return {**b, "related_facility_types": _facility_types(b)}
 
 
 def find_by_service(source: str, service_id: str) -> dict | None:
-    """챗봇 인용 출처(data-rag)의 서비스 코드로 혜택 한 건을 찾는다.
-
-    source는 data-rag 구분자(welfare_central | welfare_local) 또는 DB 값(central | local).
-    상세 화면이 쓰는 display·region_scope는 지역 조건 없이 extract_benefits로 채운다.
-    """
+    """챗봇 출처의 서비스 코드로 혜택 한 건. source는 welfare_central|welfare_local 또는 central|local."""
     _load()
     source = source.removeprefix("welfare_")
     row = next(
@@ -109,8 +102,7 @@ def search(
     if themes:
         rows = [r for r in rows if set(themes) & set(r.get("theme_codes") or [])]
     result = _search.extract_benefits(rows, life_cycles, target_groups, province, municipality)
-    # 생애주기·대상특성을 골랐을 때 그 분류가 아예 비어 있는 혜택(예: 영유아 선택 시 '농업인 건강보험료')은
-    # 목록에서 뺀다. 분류 없는 혜택은 '전체'에서만 보인다. 지역 미상은 그대로 '지역 확인'으로 둔다.
+    # 고른 생애주기·대상특성 분류가 비어 있는 혜택은 뺀다 (지역 미상은 '지역 확인'으로 둔다)
     chosen = {f for f, sel in (("life_cycle_names", life_cycles), ("target_group_names", target_groups)) if sel}
     needs_review = [b for b in result.get("needs_review", []) if not chosen & set(b.get("review_fields") or [])]
     return {
