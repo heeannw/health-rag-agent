@@ -3,12 +3,7 @@ import { useLocation } from 'react-router-dom'
 import { CheckSquare, LoaderCircle, MessageSquare, Trash2, X } from 'lucide-react'
 import { groupByDate, useChatHistory } from '../chatHistoryContext.js'
 
-/**
- * 챗봇 대화 기록 목록. 데스크톱은 왼쪽 사이드바, 모바일은 챗봇 화면의 서랍에 들어간다.
- * 챗봇 메뉴(/)가 열려 있을 때만 보인다. 새 대화는 '챗봇' 메뉴를 누르면 시작된다.
- * - 항목 클릭: 그 대화를 열고 이어서 질문
- * - 휴지통: 한 건 삭제 / '선택': 여러 건 골라 삭제
- */
+/** 챗봇 대화 기록 목록 (데스크톱 사이드바, 모바일 서랍). 챗봇 화면에서만 보인다 */
 export default function ConversationList({ onNavigate }) {
   const { conversations, activeId, open, remove, pending } = useChatHistory()
   const [selecting, setSelecting] = useState(false)

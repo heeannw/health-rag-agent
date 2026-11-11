@@ -1,7 +1,4 @@
-/**
- * 카카오 장소 검색으로 찾은 기관은 백엔드에 없어서, 지도에서 누른 장소를 여기 잠깐 보관했다가
- * 기관 상세 화면(/facilities/kakao-…)이 꺼내 쓴다. 새로고침해도 열리도록 sessionStorage에도 둔다.
- */
+/** 카카오 장소는 백엔드에 없어서 기관 상세용으로 sessionStorage에 잠깐 보관한다 */
 const STORAGE_KEY = 'health-agent:kakao-places:v1'
 const MAX = 50
 
@@ -25,7 +22,7 @@ export function savePlace(place) {
   try {
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify(all))
   } catch {
-    // 저장이 막힌 환경이면 화면 이동 때 넘긴 state로만 연다
+    // 저장이 막히면 화면 이동 state로만 연다
   }
 }
 

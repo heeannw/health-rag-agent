@@ -1,14 +1,5 @@
-"""원희 담당 data-rag 파이프라인의 generate_answer()를 호출한다.
-
-data-rag는 `sys.path.insert(0, ".")` 기준(data-rag 폴더에서 실행)으로 짜여 있어서,
-그 폴더를 sys.path에 넣고 import한다. 의존성·Chroma 인덱스·GEMINI_API_KEY가 없거나
-답변 생성이 실패하면 RagUnavailable을 낸다.
-
-지역 우선 검색: data-rag의 hybrid_search는 지역을 모른다. 그래서 '서울 노인 돌봄'을 물어도
-대구·부산 사업이 상위에 오고, LLM은 "검색결과에 없으면 못 찾았다고 하라"는 규칙대로
-'관련 정보를 찾지 못했습니다'라고 답했다. 여기서는 후보를 넉넉히 받아 사용자가 고른 지역 →
-전국 자료 순으로 다시 고른 뒤 generate_answer에 넘긴다 (data-rag 코드는 건드리지 않는다).
-"""
+"""data-rag generate_answer() 연결. 검색을 지역 우선 검색으로 바꿔 끼운다.
+data-rag를 못 쓰거나 답변 생성이 실패하면 RagUnavailable."""
 
 import contextvars
 import logging
@@ -23,10 +14,10 @@ logger = logging.getLogger(__name__)
 
 DATA_RAG_DIR = Path(__file__).resolve().parents[4] / "data-rag"
 
-# 최종으로 넘기는 개수의 몇 배를 후보로 받을지, RRF에 쓰는 dense·BM25 후보 수
+# 후보 배수, RRF 후보 수
 CANDIDATE_MULTIPLIER = 4
 CANDIDATE_K = 60
-# 내 시군구·시도 자료를 원래 검색 순서보다 몇 칸 앞으로 당길지
+# 내 시군구(3)·시도(2) 자료를 앞으로 당길 칸 수
 REGION_BOOST = {3: 4, 2: 2}
 
 _generate_answer = None
@@ -44,7 +35,7 @@ class RagUnavailable(Exception):
 # 전국 단위 자료 (중앙부처 복지사업, 법령, 급여 통계)
 NATIONWIDE_SOURCES = {"welfare_central", "law", "welfare_payment"}
 
-# 시도 이름 → 주소에 나올 수 있는 다른 표기 (전남광주통합특별시는 옛 주소도 남아 있다)
+# 시도 이름 → 주소에 나오는 다른 표기
 PROVINCE_ALIASES = {
     "서울특별시": ("서울",), "부산광역시": ("부산",), "대구광역시": ("대구",), "인천광역시": ("인천",),
     "대전광역시": ("대전",), "울산광역시": ("울산",), "세종특별자치시": ("세종",), "경기도": ("경기",),
@@ -70,10 +61,9 @@ def _split_region(region: str) -> tuple[str, str | None]:
     return province, municipality or None
 
 
-# '서울', '세종'처럼 두 글자 시도 별칭 뒤에 올 수 있는 말. 이것 말고 다른 한글이 바로 붙으면
-# ('세종대왕', '서울대병원') 지역으로 보지 않는다
+# 두 글자 시도 별칭 뒤에 올 수 있는 말 ('세종대왕', '서울대병원'은 지역 아님)
 _ALIAS_TAIL = r"(?=$|[^가-힣]|에서|에|의|은|는|이|도|시|으로|로|쪽|지역|사는|살|까지|이랑|랑|하고|권)"
-# '경기도 광주'는 경기도 광주시다. 그냥 두면 '광주'가 전남광주통합특별시로도 잡혀 시도가 둘이 된다
+# '경기도 광주'가 전남광주통합특별시로도 잡히지 않게
 _GYEONGGI_GWANGJU = re.compile(r"경기도?\s*광주(?:시)?")
 
 
@@ -86,11 +76,8 @@ def _mentions_province(text: str, province: str) -> bool:
 
 
 def _mentioned_region(text: str, current: str | None) -> str | None:
-    """글에 나온 지역 ('시도 시군구' 또는 '시도'). 없거나 하나로 안 정해지면 None.
-
-    시군구는 '중랑구'처럼 전체 이름만 본다. '중랑'처럼 줄인 이름까지 보면 '고령자'(고령군),
-    '영양'(영양군) 같은 일반 단어가 지역으로 잡힌다. '중구'처럼 여러 시도에 있는 이름은
-    글에 나온 시도 → 내 시도(current) 순으로 고른다."""
+    """글에 나온 지역('시도 시군구' 또는 '시도'), 하나로 안 정해지면 None.
+    시군구는 전체 이름만 보고('고령자' 오인 방지), 겹치는 이름은 글의 시도 → 내 시도 순으로 고른다."""
     from app.services.facilities import REGIONS  # noqa: PLC0415
 
     text = _GYEONGGI_GWANGJU.sub("경기도 광주시", text)
@@ -113,10 +100,7 @@ def _mentioned_region(text: str, current: str | None) -> str | None:
 
 
 def _region_in_question(query: str, region: str | None, history: list[dict] | None = None) -> str | None:
-    """질문에 다른 지역이 나오면 그 지역을 쓴다 ('내 지역'은 노원구인데 '중랑구에 살고 있어' 같은 경우).
-
-    이번 질문에 지역이 없으면 이전 사용자 질문을 최근 것부터 본다. 안 그러면 '중랑구 치매 검사' 다음
-    '거기 보건소는 어디야?'가 다시 내 지역(노원구)으로 검색된다. 아무 데도 없으면 원래 지역."""
+    """질문(없으면 이전 질문)에 나온 지역, 아무 데도 없으면 내 지역."""
     current = _split_region(region)[0] if region else None
     past = [t.get("content") or "" for t in reversed(history or []) if t.get("role") == "user"]
     for text in (query, *past):
@@ -153,16 +137,16 @@ def _region_rank(meta: dict, province: str, municipality: str | None) -> int:
         return 1
     if not _in_province(place, province):
         return 0
-    if municipality and municipality in place:
+    # 앞에 한글이 붙으면 다른 이름 ('서구'가 '달서구'·'강서구'에 걸리지 않게)
+    if municipality and re.search(rf"(?<![가-힣]){re.escape(municipality)}", place):
         return 3
-    # 다른 시군구의 지자체 사업은 그 주민만 받을 수 있다 (병원·센터 같은 기관은 옆 구도 갈 수 있어 둔다).
-    # '서울특별시'처럼 시도 전체 사업은 그대로 둔다
+    # 다른 시군구의 지자체 사업은 제외 (기관과 시도 전체 사업은 둔다)
     if municipality and meta.get("source") == "welfare_local" and place.strip().count(" ") >= 1:
         return 0
     return 2
 
 
-# 질문에서 핵심어를 뽑을 때 버리는 말 (어떤 사업 설명에나 나오는 말)
+# 핵심어에서 뺄 흔한 말
 _STOPWORDS = {
     "알려줘", "알려주세요", "지원", "서비스", "받을", "있는", "있어", "있나요", "어디", "어떻게", "방법",
     "관련", "대한", "정보", "무엇", "뭐가", "가능", "하는", "해줘", "주세요", "혜택", "사업",
@@ -175,7 +159,7 @@ def _keywords(text: str) -> list[str]:
 
 
 def _mentions(hit: dict, keywords: list[str]) -> bool:
-    """제목·본문에 질문 핵심어가 하나라도 있는지. '의료비를'처럼 조사가 붙은 말은 끝 글자를 떼고도 본다."""
+    """제목·본문에 핵심어가 있는지 (끝 글자 조사를 떼고도 본다)."""
     body = f"{hit['metadata'].get('title', '')} {hit.get('text', '')}"
     return any(w in body or (len(w) >= 3 and w[:-1] in body) for w in keywords)
 
@@ -194,9 +178,7 @@ def _regional_search(query_text: str, n_results: int = 5, **kwargs) -> list[dict
         return _hybrid_search(query_text, n_results=n_results, **kwargs)
     province, municipality = region
     size = n_results * CANDIDATE_MULTIPLIER
-    # 질문 앞 '[경기도 구리시]'를 붙인 채 검색하면 BM25가 지역 이름만 맞는 엉뚱한 사업
-    # (구리시 보훈수당 등)을 끌어오고, 떼면 '마포구치매안심센터'처럼 지역 이름이 핵심인 자료를 놓친다.
-    # 그래서 둘 다 검색하고, 지역을 붙여서만 나온 자료는 질문의 핵심어가 들어 있을 때만 쓴다
+    # 지역을 뗀 검색과 붙인 검색을 둘 다 하고, 붙여서만 나온 자료는 핵심어가 있을 때만 쓴다
     plain_text = re.sub(r"^\s*\[[^\]]*\]\s*", "", query_text) or query_text
     plain = _hybrid_search(plain_text, n_results=size, candidate_k=CANDIDATE_K)
     seen = {h["chunk_id"] for h in plain}
@@ -206,23 +188,20 @@ def _regional_search(query_text: str, n_results: int = 5, **kwargs) -> list[dict
         if h["chunk_id"] not in seen and _mentions(h, keywords)
     ]
     candidates = _interleave(plain, extra)
-    # 관련도(원래 검색 순서)를 기본으로 두고, 다른 지역 자료만 빼고 내 지역 자료를 몇 칸 끌어올린다.
-    # 지역만으로 정렬하면 '구리시 임산부'에 구리시 보훈수당처럼 지역만 맞는 자료가 올라온다
+    # 검색 순서를 기본으로, 다른 지역 자료는 빼고 내 지역 자료는 몇 칸 당긴다
     ranks = [_region_rank(h["metadata"], province, municipality) for h in candidates]
     order = sorted(
         (i for i, r in enumerate(ranks) if r > 0),
         key=lambda i: i - REGION_BOOST.get(ranks[i], 0),
     )
     picked = [candidates[i] for i in order[:n_results]]
-    # 내 지역·전국 자료가 하나도 없으면 원래 결과라도 넘겨 LLM이 판단하게 한다
+    # 남은 게 없으면 원래 결과라도 넘긴다
     return picked or candidates[:n_results]
 
 
 # ── data-rag 연결 ─────────────────────────────────────
 
-# data-rag 프롬프트는 "검색결과에 없으면 못 찾았다고 하라"만 있어서, '노원구 치매 무료 검사'처럼
-# 전국 공통 제도(치매안심센터 무료 진단검사)는 찾았는데 노원구 기관만 없을 때도 통째로 거절했다.
-# 답변에 문서 제목이 안 나오니 출처도 0건이 된다. 찾은 만큼은 안내하도록 규칙을 덧붙인다
+# 내 지역 기관만 못 찾았을 때 통째로 거절하지 말고 찾은 만큼 안내하도록 덧붙이는 규칙
 PARTIAL_ANSWER_RULES = """
 - 질문 앞 [지역]은 사용자가 사는 지역입니다. 질문이 그 지역의 기관·장소를 찾는데 검색결과에 없으면,
   전국 공통 제도나 같은 시도의 기관처럼 관련된 내용을 안내하고, 그 지역 기관은 찾지 못했다고 한 줄로 밝힌 뒤
@@ -238,7 +217,7 @@ def _load():
     global _generate_answer, _hybrid_search
     if _generate_answer:
         return
-    # 서버 시작 때 warm_up 스레드와 첫 질문이 동시에 들어와도 한 번만 바꿔 끼운다
+    # warm_up과 첫 질문이 겹쳐도 한 번만
     with _load_lock:
         if _generate_answer:
             return
@@ -250,16 +229,15 @@ def _load():
             import pipeline.hybrid_search as hybrid  # noqa: PLC0415
         except Exception as e:  # 의존성 미설치 등
             raise RagUnavailable(f"data-rag 불러오기 실패 ({type(e).__name__}: {e})") from e
-        # BGE-M3와 BM25도 이 잠금 안에서 불러온다. data-rag의 get_model()엔 잠금이 없어서, 서버 켜자마자
-        # 질문하면 warm_up 스레드와 질문 스레드가 모델을 동시에 불러오다 'Cannot copy out of meta tensor'로 죽었다
+        # 모델도 잠금 안에서 불러온다 (동시 로딩 시 'Cannot copy out of meta tensor' 오류)
         try:
             embed.get_model()
             hybrid._get_bm25_index()
         except Exception as e:
             raise RagUnavailable(f"검색 모델·인덱스 불러오기 실패 ({type(e).__name__}: {e})") from e
-        # 원본은 hybrid_search 모듈에서 가져온다 (generate 쪽 이름은 이미 바꿔 끼운 것일 수 있다)
+        # 원본은 hybrid_search 모듈에서 (generate 쪽은 이미 바뀐 것일 수 있다)
         _hybrid_search = hybrid.hybrid_search
-        # generate_answer가 모듈 안에서 부르는 hybrid_search를 지역 우선 검색으로 바꿔 끼운다
+        # generate_answer가 부르는 검색을 지역 우선 검색으로 교체
         generate.hybrid_search = _regional_search
         if PARTIAL_ANSWER_RULES not in generate.SYSTEM_PROMPT:
             generate.SYSTEM_PROMPT += PARTIAL_ANSWER_RULES
@@ -268,14 +246,14 @@ def _load():
 
 
 def _guard_client(generate) -> list:
-    """질문 분류(guard)에 쓸 LLM. data-rag와 같은 Gemini 키·모델을 쓴다. 없으면 규칙 검사만."""
+    """질문 분류용 LLM (data-rag와 같은 Gemini). 키가 없으면 빈 목록."""
     try:
         from config import GEMINI_API_KEY  # noqa: PLC0415 (data-rag/config.py)
         from openai import OpenAI  # noqa: PLC0415
 
         if not GEMINI_API_KEY:
             return []
-        # 분류는 빨리 끝나야 해서 재시도하지 않는다 (실패하면 통과시키고 답변 단계로 넘어감)
+        # 분류는 빨라야 해서 재시도 없음
         client = OpenAI(api_key=GEMINI_API_KEY, base_url=generate.GEMINI_BASE_URL, max_retries=0, timeout=15)
         return [client, generate.MODEL]
     except Exception:
@@ -284,29 +262,31 @@ def _guard_client(generate) -> list:
 
 
 def warm_up() -> None:
-    """BGE-M3·Chroma·BM25를 미리 불러온다. 안 하면 서버 켜고 첫 질문이 1분 가까이 걸린다.
-    LLM은 부르지 않는다(검색만 한 번 돌림)."""
+    """BGE-M3·Chroma·BM25를 미리 불러온다 (LLM은 부르지 않음)."""
     try:
         _load()
         _hybrid_search("의료 혜택", n_results=1)
         logger.info("RAG 모델·인덱스 미리 불러오기 완료")
-    except Exception:  # 실패해도 서버는 뜨고, 질문할 때 503으로 사유가 나간다
+    except Exception:  # 실패하면 질문 때 503
         logger.warning("RAG 미리 불러오기 실패", exc_info=True)
 
 
 def ask(query: str, n_results: int, region: str | None = None, history: list[dict] | None = None) -> dict:
-    _load()
-    # 서비스 범위를 벗어난 질문(잡담·진단 요청·욕설·프롬프트 조작 등)은 검색 전에 안내 문구로 돌려보낸다
-    reason = guard.check(query, history, llm=_guard_llm or None)
+    # 범위 밖 질문은 검색 전에 막는다. 규칙 검사는 모델 로딩 전에 (위기 안내가 RAG 장애에 막히지 않게)
+    reason = guard.rule_check(query)
+    if not reason:
+        _load()
+        reason = guard.llm_check(query, history, llm=_guard_llm or None)
     if reason:
-        logger.info("질문 차단 (%s): %s", reason, query[:80])
+        # 질문 원문은 남기지 않는다 (위기·건강 관련 민감한 내용일 수 있음)
+        logger.info("질문 차단 (%s)", reason)
         return guard.blocked_response(reason)
     asked = _region_in_question(query, region, history)
     if asked != region:
         logger.info("질문에 나온 지역으로 검색: %s → %s", region, asked)
         region = asked
     if region:
-        # 답변도 지역 맞춤이 되도록 질문 앞에 사용자가 고른 지역을 붙인다
+        # 답변도 지역 맞춤이 되게 질문 앞에 지역을 붙인다
         query = f"[{region}] {query}"
     token = _region.set(_split_region(region) if region else None)
     try:
@@ -314,7 +294,7 @@ def ask(query: str, n_results: int, region: str | None = None, history: list[dic
     except Exception as e:  # chroma_db 없음, LLM 호출 실패 등
         logger.exception("generate_answer 실패")
         if type(e).__name__ == "RateLimitError":
-            # 무료 등급은 하루 요청 수 한도가 작다(모델별 하루 20회 등). 하루 한도와 분당 한도를 구분해 안내
+            # Gemini 무료 등급: 하루 한도와 분당 한도를 구분해 안내
             if "per day" in str(e).lower() or "perday" in str(e).lower():
                 raise RagUnavailable(
                     "오늘 쓸 수 있는 답변 생성 한도(Gemini 무료 사용량)를 다 썼어요. 내일 다시 시도하거나 API 키 요금제를 확인해 주세요."

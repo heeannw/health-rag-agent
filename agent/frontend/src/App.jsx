@@ -1,4 +1,3 @@
-import { Suspense, lazy } from 'react'
 import { BrowserRouter, NavLink, Route, Routes } from 'react-router-dom'
 import { Gift, MapPinned, MessageCircleHeart, ShieldCheck } from 'lucide-react'
 import ChatPage from './pages/ChatPage.jsx'
@@ -11,9 +10,6 @@ import { RegionProvider, RegionSelect } from './region.jsx'
 import { ChatHistoryProvider } from './chatHistory.jsx'
 import { useChatHistory } from './chatHistoryContext.js'
 import ConversationList from './components/ConversationList.jsx'
-
-// three.js가 커서 첫 화면 이후에 따로 불러온다
-const AppBackground = lazy(() => import('./components/AppBackground.jsx'))
 
 const NAV = [
   { to: '/', label: '챗봇', icon: MessageCircleHeart, end: true },
@@ -37,12 +33,7 @@ export default function App() {
     <BrowserRouter>
       <RegionProvider>
       <ChatHistoryProvider>
-        <div className="app-bg" aria-hidden="true">
-          <Suspense fallback={null}>
-            <AppBackground />
-          </Suspense>
-          <div className="app-bg-wash" />
-        </div>
+        <div className="app-bg" aria-hidden="true" />
 
         <div className="shell">
           <aside className="sidebar glass">

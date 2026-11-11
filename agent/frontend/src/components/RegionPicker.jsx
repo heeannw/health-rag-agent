@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronDown, ChevronLeft, LoaderCircle, LocateFixed, MapPin, Search, X } from 'lucide-react'
 
-// 시도 버튼에 쓸 짧은 이름과 보여줄 순서. 목록에 없는 시도는 원래 이름으로 맨 뒤에 붙는다
+// 시도 버튼 짧은 이름과 순서 (없는 시도는 맨 뒤)
 const PROVINCE_SHORT = {
   서울특별시: '서울', 경기도: '경기', 인천광역시: '인천', 부산광역시: '부산', 대구광역시: '대구',
   전남광주통합특별시: '전남·광주', 대전광역시: '대전', 울산광역시: '울산', 세종특별자치시: '세종',
@@ -12,10 +12,7 @@ const ORDER = Object.keys(PROVINCE_SHORT)
 const shortOf = (p) => PROVINCE_SHORT[p] ?? p
 const MAX_SEARCH = 30
 
-/**
- * 내 지역 선택. 시군구가 200개가 넘어서 한 목록에 다 펼치지 않고
- * 시도 → 시군구 두 단계로 고르거나, 이름으로 바로 검색한다.
- */
+/** 내 지역 선택: 시도 → 시군구 두 단계 또는 이름 검색 */
 export default function RegionPicker({ regions, region, keyOf, onChoose, locate, locating, locateError }) {
   const [open, setOpen] = useState(false)
   const [province, setProvince] = useState(region.province)

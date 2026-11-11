@@ -12,13 +12,10 @@ import { getPlace, isKakaoPlace } from '../placeCache.js'
 import { useRegion } from '../regionContext.js'
 import { benefitPath } from '../benefitMeta.js'
 
-// 연계 혜택은 전부 받아 두고 처음엔 PAGE개만, '더보기'를 누를 때마다 PAGE개씩 더 보여준다
+// 연계 혜택 '더보기' 단위
 const PAGE = 5
 
-/**
- * 카카오 장소 검색으로 찾은 기관은 백엔드에 없어서, 지도에서 넘겨준(또는 보관해 둔) 장소 정보로 연다.
- * 연계 혜택을 찾을 수 있게 좌표로 시도·시군구를 채운다.
- */
+/** 카카오 장소는 넘겨받거나 보관한 정보로 열고, 좌표로 시도·시군구를 채운다 */
 async function loadKakaoPlace(id, passed) {
   const place = passed ?? getPlace(id)
   if (!place) throw new Error('카카오 장소 정보는 지도에서 기관을 다시 눌러 열어 주세요.')
@@ -32,17 +29,14 @@ async function loadKakaoPlace(id, passed) {
   }
 }
 
-// 기관 지역에서 받을 수 있는 혜택 중 이 기관 유형과 관련된 것만 (관계없는 혜택으로 채우지 않는다)
-// related_facility_types는 백엔드가 혜택 이름·요약·신청방법 키워드로 추정한 값
-// (기관-혜택 직접 매핑은 가은 데이터 확정 후 교체)
-// 약국은 연계 혜택을 보여주지 않는다
+// 기관 지역 혜택 중 이 기관 유형과 관련된 것만 (related_facility_types는 키워드 추정). 약국은 제외
 const NO_BENEFIT_TYPES = ['pharmacy']
 
 async function linkedBenefits(f) {
   if (!f.province || NO_BENEFIT_TYPES.includes(f.type)) return []
   const { matched, needs_review } = await getBenefits({ province: f.province, municipality: f.municipality })
   return [...matched, ...needs_review]
-    .filter((b) => b.related_facility_types?.includes(f.type) || b.related_facility_type === f.type)
+    .filter((b) => b.related_facility_types?.includes(f.type))
 }
 
 export default function FacilityDetailPage() {
@@ -69,7 +63,8 @@ export default function FacilityDetailPage() {
       .then((f) => {
         if (cancelled) return []
         setFacility(f)
-        return linkedBenefits(f)
+        // 혜택 DB가 안 돼도 기관 정보는 보여준다
+        return linkedBenefits(f).catch(() => [])
       })
       .then((list) => !cancelled && setBenefits(list))
       .catch((e) => !cancelled && setError(e.message))
@@ -102,7 +97,6 @@ export default function FacilityDetailPage() {
     <section className="page page-full">
       <Link to="/map" className="back"><ArrowLeft size={18} />지도로</Link>
 
-      {/* 기관명·버튼·정보(왼쪽)와 지도(오른쪽)를 카드 하나로 */}
       <div className="detail-card glass">
         <div className="detail-main">
           <div className="detail-hero">
@@ -118,18 +112,21 @@ export default function FacilityDetailPage() {
               <Navigation size={16} />카카오맵에서 길찾기
             </a>
           )}
-          <button
-            type="button"
-            className="btn ask"
-            onClick={() => navigate(`/?q=${encodeURIComponent(`${facility.name}에서 받을 수 있는 서비스 알려줘`)}`)}
-          >
-            <MessageCircleHeart size={16} />챗봇에 물어보기
-          </button>
+          {facility.type !== 'pharmacy' && (
+            <button
+              type="button"
+              className="btn ask"
+              onClick={() => navigate(`/?q=${encodeURIComponent(`${facility.name}에서 받을 수 있는 서비스 알려줘`)}`)}
+            >
+              <MessageCircleHeart size={16} />챗봇에 물어보기
+            </button>
+          )}
         </div>
         <ul className="info-list">
           <li><MapPin size={18} strokeWidth={1.8} /><span>주소</span><strong>{facility.address ?? '-'}</strong></li>
           <li><Phone size={18} strokeWidth={1.8} /><span>전화</span><strong>{facility.phone ?? '-'}</strong></li>
-          {Object.entries(facility.details).map(([k, v]) => (
+          {/* '위치 출처'는 내부용이라 숨긴다 */}
+          {Object.entries(facility.details).filter(([k]) => k !== '위치 출처').map(([k, v]) => (
             <li key={k}><Info size={18} strokeWidth={1.8} /><span>{k}</span><strong>{String(v)}</strong></li>
           ))}
           {facility.grades.length > 0 && (
@@ -175,7 +172,6 @@ export default function FacilityDetailPage() {
         </div>
       )}
 
-      {/* 제공 서비스는 데이터가 있는 기관에서만 보여주고, 없으면 연계 혜택이 한 줄을 다 쓴다 */}
       {(hasServices || showBenefits) && (
       <div className={`detail-columns ${hasServices && showBenefits ? '' : 'single'}`}>
         {hasServices && (

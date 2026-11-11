@@ -1,17 +1,5 @@
-"""'내 지역' 선택 목록(전국 시도·시군구 + 기준 좌표)을 만들어 agent/backend/data/regions.json으로 저장한다.
-
-치매안심센터는 시군구마다 한 곳 이상 있어서, data/facilities.json의 치매안심센터 좌표·주소를
-카카오 좌표→행정구역 / 주소 검색 API에 넣어 시군구 이름을 모은다. 이름은 카카오 기준이라 프론트가
-현재 위치로 찾는 지역 이름(kakao.js regionFromCoords)과 같다. 기준 좌표는 카카오 주소 검색으로
-'시도 시군구'를 찾은 대표 지점이다.
-
-시군구는 '수원시 팔달구'처럼 일반구까지 내려가지 않고 '수원시'까지만 쓴다
-(혜택 DB provider_municipality가 시 단위라서).
-
-필요한 키: 루트 .env KAKAO_REST_API_KEY
-실행 (agent/backend 폴더에서, collect_facilities.py를 먼저 돌려 facilities.json이 있어야 함):
-    python scripts/build_regions.py
-"""
+"""facilities.json의 치매안심센터 위치로 전국 시도·시군구(시 단위)와 기준 좌표를 모아 data/regions.json으로 저장.
+실행(agent/backend, 키: KAKAO_REST_API_KEY): python scripts/build_regions.py"""
 
 import json
 import os
@@ -53,9 +41,7 @@ def region_of(lat: float, lng: float) -> tuple[str, str | None] | None:
 
 
 def region_of_address(address: str | None) -> tuple[str, str | None] | None:
-    """원문 좌표가 시군구 경계 너머로 찍힌 기관이 있어서(예: 광명시 → 금천구) 주소로도 한 번 더 찾는다."""
-    # 상세주소('3층' 등)가 붙으면 검색이 안 돼서 '시도 시군구'만 찾는다. 결과 지역명은 '서울'처럼
-    # 줄임말이라 좌표만 받아 좌표→행정구역으로 다시 찾는다
+    """주소 앞 '시도 시군구'로 지역 찾기 (좌표가 경계 너머로 찍힌 기관 보정)."""
     parts = (address or "").split()
     point = center_of(" ".join(parts[:2])) if len(parts) >= 2 else None
     return region_of(*point) if point else None
@@ -79,7 +65,7 @@ def main():
         for found in (f.get("lat") and region_of(f["lat"], f["lng"]), region_of_address(f.get("address"))):
             if found:
                 names.add(found)
-    # 시도 '전체' 항목도 하나씩 넣는다 (세종처럼 시군구가 없는 곳은 이것만 남는다)
+    # 시도 '전체' 항목도 넣는다
     names |= {(province, None) for province, _ in names}
 
     regions = []

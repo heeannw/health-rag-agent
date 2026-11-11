@@ -1,21 +1,5 @@
-"""지도 화면용 공공데이터 기관 목록을 모아 agent/backend/data/facilities.json으로 저장한다.
-
-원희 data-rag의 수집기(collectors/)를 그대로 불러 쓰고, 좌표가 없는 기관은 카카오
-주소 검색 REST API로 좌표를 붙인다. 백엔드는 이 파일이 있으면 샘플 대신 이걸 쓴다.
-
-필요한 키
-- 루트 .env  DATA_GO_KR_API_KEY (data.go.kr 일반 인증키)
-- 루트 .env  KAKAO_REST_API_KEY (카카오 앱 키 > REST API 키, 없으면 좌표 변환 생략)
-
-실행 (agent/backend 폴더에서, requests·xmltodict가 설치된 venv):
-    python scripts/collect_facilities.py                              # 기본: 서울특별시
-    python scripts/collect_facilities.py --provinces 서울특별시 경기도
-
-치매안심센터는 전국(원문에 좌표 있음), 병원·장기요양기관은 --provinces 지역만 좌표를 붙인다.
-병원평가 원문은 지역 필터가 안 돼서 전국(약 3.7만 건)을 받은 뒤 주소로 거른다.
-장기요양기관 원문에는 주소가 없어서 카카오 키워드 검색(기관명)으로 위치를 찾고,
-찾은 주소가 해당 시도가 아니면 버린다.
-"""
+"""공공데이터 기관을 모아 data/facilities.json으로 저장 (키: DATA_GO_KR_API_KEY, KAKAO_REST_API_KEY).
+실행(agent/backend): python scripts/collect_facilities.py [--provinces 서울특별시 경기도]  # 치매센터는 항상 전국"""
 
 import argparse
 import json
@@ -50,8 +34,7 @@ PROVINCE_CODES = {
 }
 
 
-# 병원평가 asmGrdNN → 평가항목. 출처: OpenAPI활용가이드_건강보험심사평가원(병원평가정보서비스)_20250219.docx
-# 값은 1~5등급(1등급이 가장 우수) 또는 '등급제외'. 천식(16)만 등급 없이 양호한 기관을 공개한다.
+# 병원평가 asmGrdNN → 평가항목 (활용가이드 2025-02-19 기준). 값은 1~5등급 또는 '등급제외'
 GRADE_ITEMS = {
     "01": "급성기뇌졸중", "03": "혈액투석", "04": "의료급여정신과", "05": "수술부위 감염예방 항생제",
     "06": "관상동맥우회술", "07": "급성상기도감염 항생제 처방률", "08": "주사제 처방률", "09": "약품목수",
@@ -93,8 +76,7 @@ def _region(address: str | None) -> tuple[str | None, str | None]:
 
 
 def dedupe(facilities: list[dict]) -> list[dict]:
-    """같은 id는 하나만 남긴다. 장기요양기관 원문은 같은 기관이 여러 번 오고, 치매센터는
-    시도 개편 전후 주소로 두 번 오는 곳이 있어서 기준일이 가장 최근인 것을 남긴다."""
+    """같은 id는 기준일이 가장 최근인 것 하나만 남긴다."""
     latest: dict[str, dict] = {}
     for f in facilities:
         prev = latest.get(f["id"])
@@ -158,10 +140,7 @@ class Geocoder:
         return self.cache[key]
 
     def place(self, name: str | None, district_code: str) -> dict | None:
-        """기관명 키워드 검색 → 원문 시군구 코드와 같은 구에 있는 첫 결과 {lat, lng, address, phone}.
-
-        같은 이름의 다른 지역 기관이 잡히지 않도록 결과 좌표의 법정동 코드로 확인한다.
-        """
+        """기관명 키워드 검색 결과 중 시군구 코드가 같은 첫 곳 {lat, lng, address, phone}."""
         if not name or not KAKAO_REST_API_KEY:
             return None
         key = f"place:{district_code}:{name}"
@@ -185,7 +164,7 @@ def _save_raw(name: str, items: list[dict]):
 
 
 def _retry(fetch, tries: int = 4, **kwargs) -> dict:
-    """data.go.kr는 큰 응답이 중간에 끊기거나 DNS가 잠깐 실패하는 일이 잦아 몇 번 다시 시도한다."""
+    """data.go.kr 일시 오류(응답 끊김·DNS)에 대비해 몇 번 다시 시도한다."""
     for attempt in range(tries):
         try:
             return fetch(**kwargs)
@@ -214,7 +193,7 @@ def _paged(fetch, rows: int, page_size: int = 500, **params) -> list[dict]:
 
 
 def collect_dementia_centers(geocode: Geocoder) -> list[dict]:
-    """전국치매센터표준데이터 — 원문에 위도·경도가 있어 좌표 변환이 거의 필요 없다."""
+    """전국치매센터표준데이터 (원문에 좌표 있음)."""
     items = _paged(dementia_center.search_dementia_centers, rows=2000)
     _save_raw("dementia_center", items)
     result = []
@@ -223,7 +202,7 @@ def collect_dementia_centers(geocode: Geocoder) -> list[dict]:
         lat, lng = _float(it.get("latitude")), _float(it.get("longitude"))
         if lat is None:
             lat, lng = geocode(address)
-        # insttNm(관리기관 지역, 예: '서울특별시 강서구')이 주소보다 행정구역 표기가 고르다
+        # insttNm(관리기관 지역)이 주소보다 표기가 고르다
         province, municipality = _region(it.get("insttNm") or address)
         stats = [
             {"label": label, "value": f"{it[key]}명"}
@@ -251,7 +230,7 @@ def collect_dementia_centers(geocode: Geocoder) -> list[dict]:
 
 
 def collect_hospitals(geocode: Geocoder, provinces: list[str]) -> list[dict]:
-    """건강보험심사평가원 병원평가정보 — 주소만 있어 카카오로 좌표를 붙인다."""
+    """병원평가정보 (주소만 있어 카카오로 좌표 변환)."""
     items = _paged(hospital.search_hospital_assessment, rows=100_000)
     _save_raw("hospital", items)
     result = []
@@ -278,7 +257,7 @@ def collect_hospitals(geocode: Geocoder, provinces: list[str]) -> list[dict]:
 
 
 def collect_ltc_institutions(geocode: Geocoder, provinces: list[str]) -> list[dict]:
-    """국민건강보험공단 장기요양기관 검색 — 원문에 주소·전화가 없어 카카오 키워드 검색으로 찾는다."""
+    """장기요양기관 (주소·전화가 없어 카카오 키워드 검색으로 찾음)."""
     raw: list[dict] = []
     result = []
     for province in provinces:

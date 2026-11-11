@@ -1,11 +1,5 @@
-"""지도 화면 기관 목록과 '내 지역' 선택 목록.
-
-- data/facilities.json  scripts/collect_facilities.py가 만든 공공데이터 기관
-- data/regions.json     scripts/build_regions.py가 만든 전국 시도·시군구와 기준 좌표
-
-파일이 없으면 빈 목록을 돌려주고 경고만 남긴다. 서버 시작 때 한 번 읽으므로
-파일을 새로 만들면 백엔드를 다시 켜야 한다.
-"""
+"""data/facilities.json(기관)과 data/regions.json(지역)을 서버 시작 때 한 번 읽는다.
+파일이 없으면 빈 목록. 다시 만들면 백엔드를 재시작해야 한다."""
 
 import json
 import logging

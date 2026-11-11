@@ -9,7 +9,7 @@ import {
   LIFE_CYCLES, REVIEW_LABELS, STATUS, THEMES, benefitPath, hasRegion, iconFor, periodOf, toneFor,
 } from '../benefitMeta.js'
 
-// 검색은 이미 받아온 혜택 안에서 한다. 띄어쓰기는 무시하고, 여러 단어는 모두 들어간 것만(AND)
+// 받아온 혜택 안에서 검색 (띄어쓰기 무시, 여러 단어는 AND)
 const squash = (t) => (t ?? '').replace(/\s+/g, '').toLowerCase()
 const haystack = (b) => squash([
   b.name, b.summary_text, b.criteria_text, b.application_method, b.display?.target_group, b.display?.life_cycle,
@@ -28,15 +28,14 @@ function searchBenefits(list, query) {
 }
 
 export default function BenefitsPage() {
-  const { region, label: regionLabel, shortLabel } = useRegion()
+  const { region, shortLabel } = useRegion()
   const [lifeCycles, setLifeCycles] = useState([])
   const [themes, setThemes] = useState([])
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
-  // 검색어는 주소(?q=)에 둬서 상세 페이지에 갔다가 뒤로 와도 남아 있게 한다
   const [params, setParams] = useSearchParams()
   const query = params.get('q') ?? ''
-  // 검색어·페이지·한 페이지 개수 모두 주소에 둔다. 값이 비거나 기본값이면 주소에서 뺀다
+  // 검색어·페이지·개수는 주소에 둔다 (뒤로 와도 유지, 기본값은 생략)
   const updateParams = (patch) => setParams((prev) => {
     const next = new URLSearchParams(prev)
     for (const [k, v] of Object.entries(patch)) {
@@ -48,26 +47,29 @@ export default function BenefitsPage() {
   const setQuery = (q) => updateParams({ q, page: 1 })
   const pageSize = PAGE_SIZES.includes(Number(params.get('size'))) ? Number(params.get('size')) : PAGE_SIZES[0]
   const requestedPage = Math.max(1, Number(params.get('page')) || 1)
-  // 입력 중인 글자(draft)와 실제 검색어(query)를 나눠서, 엔터나 검색 아이콘을 눌렀을 때만 결과를 바꾼다
+  // 입력(draft)과 검색어(query)를 나눠 제출할 때만 검색
   const [draft, setDraft] = useState(query)
-  useEffect(() => { setDraft(query) }, [query]) // 뒤로가기 등으로 주소의 검색어가 바뀌면 입력창도 맞춘다
+  useEffect(() => { setDraft(query) }, [query])
   const submitSearch = (e) => {
     e.preventDefault()
-    // 한글 입력 중 엔터를 눌러도 마지막 글자까지 들어가게 state 대신 입력창 값을 읽는다
+    // 한글 조합 중 엔터에도 마지막 글자가 들어가게 입력창 값을 읽는다
     setQuery(e.currentTarget.elements.q.value.trim())
   }
   const clearSearch = () => { setDraft(''); setQuery('') }
 
   useEffect(() => {
-    if (!region) return
+    // 늦게 온 이전 응답은 버린다
+    let cancelled = false
     setError(null)
     getBenefits({ province: region.province, municipality: region.municipality, life_cycle: lifeCycles, themes })
-      .then(setData)
-      .catch((e) => setError(e.message))
+      .then((d) => !cancelled && setData(d))
+      .catch((e) => !cancelled && setError(e.message))
+    return () => {
+      cancelled = true
+    }
   }, [region, lifeCycles, themes])
 
-  // '조건 일치'와 '원문 확인 필요'를 한 목록으로 합친다 (일치하는 것 먼저).
-  // 원문 확인이 필요한 혜택은 카드에 '○○ 확인' 태그가 붙어서 구분된다
+  // 조건 일치 → 원문 확인 필요 순으로 한 목록
   const results = useMemo(
     () => searchBenefits([...(data?.matched ?? []), ...(data?.needs_review ?? [])], query),
     [data, query],
@@ -94,12 +96,11 @@ export default function BenefitsPage() {
 
   return (
     <section className="page page-wide">
-      <header className="page-head">
-        <h1>{regionLabel ? `${shortLabel} · ${lifeCycleTitle(lifeCycles)}` : '나에게 맞는 의료·복지 혜택'}</h1>
-        <p>{regionLabel} 주민이 받을 수 있는 혜택을 모았어요. 지역은 왼쪽 메뉴에서 바꿀 수 있어요.</p>
+      <header className="page-head benefits-head">
+        <h1>{`${shortLabel} · ${lifeCycleTitle(lifeCycles)}`}</h1>
+        <p className="filter-note"><Info size={14} strokeWidth={1.8} />소득 정보는 묻지 않아요. 각 혜택의 공식 선정기준을 보고 직접 확인해 주세요.</p>
       </header>
 
-      {/* 검색 · 생애주기 · 분야를 한 패널로 묶는다 (따로 떠 있으면 서로 관계없어 보여서) */}
       <div className="filter-panel glass">
       <form className="search benefit-search" role="search" onSubmit={submitSearch}>
         <button type="submit" className="search-submit" aria-label="검색">
@@ -123,7 +124,7 @@ export default function BenefitsPage() {
 
       <div className="filter-row">
         <span className="filter-label">연령</span>
-        {/* 여러 개 고를 수 있다(OR). '전체'는 고른 걸 모두 푼다 */}
+        {/* 여러 개 선택(OR), '전체'는 모두 해제 */}
         <div className="segmented" role="group" aria-label="생애주기 (여러 개 선택 가능)">
           {LIFE_CYCLES.map(({ value, label, icon: Icon }) => {
             const on = value ? lifeCycles.includes(value) : lifeCycles.length === 0
@@ -156,7 +157,6 @@ export default function BenefitsPage() {
         ))}
         </div>
       </div>
-      <p className="filter-note"><Info size={14} strokeWidth={1.8} />소득 정보는 묻지 않아요. 각 혜택의 공식 선정기준을 보고 직접 확인해 주세요.</p>
       </div>
 
       {error && <p className="error">{error}</p>}
@@ -166,7 +166,6 @@ export default function BenefitsPage() {
           <p className={searching ? 'search-summary' : ''}>
             {searching ? <>‘{query.trim()}’ 검색 결과 </> : '전체 '}
             <strong>{results.length}건</strong>
-            {results.length > 0 && <span className="results-range"> · {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, results.length)}번째</span>}
           </p>
           <label className="page-size">
             <span>한 페이지에</span>
@@ -196,16 +195,16 @@ export default function BenefitsPage() {
 }
 
 const PAGE_SIZES = [10, 50, 100]
-// search_benefits가 분류가 비어 있을 때 넣는 표시 문구 (UNKNOWN_LABEL)
+// search_benefits의 UNKNOWN_LABEL
 const UNKNOWN_AUDIENCE = '대상 원문 확인'
 
-/** 제목에 쓸 연령 이름. 화면 표기(label)로, LIFE_CYCLES 순서대로 '영유아, 아동' 처럼 잇는다 */
+/** 제목용 연령 이름 ('영유아, 아동') */
 function lifeCycleTitle(selected) {
   if (!selected.length) return '전체 연령'
   return LIFE_CYCLES.filter((c) => c.value && selected.includes(c.value)).map((c) => c.label).join(', ')
 }
 
-/** 1 … 4 5 [6] 7 8 … 20 처럼 현재 페이지 주변만 번호로 보여준다 */
+/** 1 … 4 5 [6] 7 8 … 20 형태의 페이지 번호 */
 function pageNumbers(page, count) {
   const set = new Set([1, count, page - 2, page - 1, page, page + 1, page + 2])
   const nums = [...set].filter((n) => n >= 1 && n <= count).sort((a, b) => a - b)
@@ -240,16 +239,13 @@ function Pagination({ page, pageCount, onChange }) {
   )
 }
 
-// 카드 한 장: 아이콘·구분 태그 | 이름(2줄) | 요약(3줄) | 대상·지역·기간.
-// 넓은 화면에선 한 줄에 5장이라 기본 10개씩이면 2줄이 된다. 긴 원문은 상세 페이지에서 보여준다
+// 혜택 카드: 태그 | 이름(2줄) | 요약(3줄) | 대상·지역·기간
 function BenefitCard({ b, region }) {
   const Icon = iconFor(b)
-  // 카드에선 신청 기간을 알 때만 상태 태그를 단다 ('기간 확인'은 빼고, 자세한 건 상세 페이지에서)
+  // 카드에선 아는 정보만 ('기간·지역·대상 확인'류는 뺀다)
   const status = b.application_status !== 'unknown' ? STATUS[b.application_status] : null
   const period = periodOf(b)
-  // '지역 확인'도 카드에선 뺀다. 지역을 모르는 혜택은 아래 '지역' 줄이 이미 빠져 있다
   const reviews = b.review_fields.filter((f) => f !== 'region')
-  // '대상 원문 확인'(분류가 비어 있음)은 카드에서 빼고, 아는 대상만 보여 준다. 둘 다 모르면 '대상' 줄을 뺀다
   const audience = [b.display.life_cycle, b.display.target_group].filter((t) => t && t !== UNKNOWN_AUDIENCE).join(' · ')
   return (
     <li className="benefit-card glass">
@@ -270,7 +266,6 @@ function BenefitCard({ b, region }) {
         )}
         <dl className="bc-meta">
           {audience && <><dt>대상</dt><dd title={audience}>{audience}</dd></>}
-          {/* 제공 지역 정보가 없는 혜택('대상 원문 확인')은 위치 표시를 뺀다 */}
           {hasRegion(b) && <><dt>지역</dt><dd title={b.display.region}>{b.display.region}</dd></>}
           {period && <><dt>기간</dt><dd title={period}>{period}</dd></>}
         </dl>
