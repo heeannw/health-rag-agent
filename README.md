@@ -64,7 +64,8 @@ uvicorn app.main:app --reload --port 8000
 
 - 두 번째 `pip install`은 챗봇용입니다. `chromadb==0.5.23`은 Windows·Python 3.12에서 빌드 도구 없이는 설치가 안 돼 `chromadb>=1.0`으로 덮어씁니다.
 - 처음 실행하면 BGE-M3 모델(약 2GB)을 내려받고, 서버가 뜬 뒤 수십 초 동안 모델·인덱스를 미리 불러옵니다.
-- 확인: http://localhost:8000/api/health , API 문서: http://localhost:8000/docs
+- 서버 확인: http://localhost:8000/api/health
+- API 문서: http://localhost:8000/docs
 
 ### 2. 프론트엔드 (터미널 2)
 
